@@ -205,34 +205,302 @@ ROCK 3Bは非常用Webサーバー専用のTunnelを持ち、通常時の通信�
 
 ### 4.2 Webフェイルオーバー
 
-Ryzen側のWebサービスが利用不能になった場合、Cloudflare側でWebの宛先をROCK 3Bへ切り替える。
+Webサーバーの冗長化には、Cloudflare Load BalancingによるActive-Passive Failoverを使用する。
+
+RyzenとROCK 3Bにはそれぞれ独立したCloudflare Tunnelを構築し、同一Tunnelのreplicaとしては構成しない。
 
 ```mermaid
-flowchart LR
+flowchart TD
     Client["Client"]
     CF["Cloudflare"]
-    Select{"Web origin"}
+    LB["Cloudflare Load Balancer<br>Off - Failover"]
 
-    Ryzen["Ryzen<br>Primary nginx"]
-    Rock["ROCK 3B<br>Emergency nginx"]
+    Primary["Primary Pool"]
+    Standby["Standby Pool"]
 
-    Client --> CF
-    CF --> Select
-    Select -->|"Normal"| Ryzen
-    Select -.->|"Ryzen unavailable"| Rock
+    RT["Ryzen Tunnel<br>UUID A"]
+    BT["ROCK Tunnel<br>UUID B"]
+
+    RN["Ryzen nginx"]
+    BN["ROCK nginx"]
+
+    Client --> CF --> LB
+
+    LB -->|"通常時"| Primary
+    LB -.->|"Primary unhealthy"| Standby
+
+    Primary --> RT --> RN
+    Standby --> BT --> BN
 ```
 
-障害検出対象には、可能な限り単なるTunnel接続状態ではなく、nginx上のhealth check endpointを使用する。
+#### Tunnel構成
 
-例:
+以下の2本のTunnelを独立して作成する。
+
+```text
+web-ryzen
+└── Ryzen nginx
+
+web-rock
+└── ROCK 3B nginx
+```
+
+それぞれ異なるTunnel UUIDを持たせる。
+
+同一Tunnel UUIDをRyzenとROCKで共有する構成は採用しない。
+
+これは、同一TunnelのreplicaではCloudflare Load Balancerから個別のoriginとして識別できず、RyzenとROCK間で明示的な優先順位を設定できないためである。
+
+#### Load Balancer構成
+
+Web公開hostnameにCloudflare Public Load Balancerを設定する。
+
+Load Balancerには以下の2つのpoolを設定する。
+
+| Pool          | Endpoint          | 役割                 |
+| ------------- | ----------------- | ------------------ |
+| `web-primary` | Ryzen Tunnel UUID | Primary            |
+| `web-standby` | ROCK Tunnel UUID  | Standby / Fallback |
+
+Tunnel endpointには以下の形式を使用する。
+
+```text
+<RYZEN_TUNNEL_UUID>.cfargotunnel.com
+<ROCK_TUNNEL_UUID>.cfargotunnel.com
+```
+
+各endpointにはWeb公開hostnameをHost headerとして設定する。
+
+Traffic Steeringは `Off - Failover` とし、poolの優先順位を以下とする。
+
+```text
+1. web-primary
+2. web-standby
+```
+
+Fallback Poolには`web-standby`を指定する。
+
+これにより通常時はRyzenのみへトラフィックを送り、Ryzen側poolがunhealthyと判定された場合のみROCK 3Bへ切り替える。
+
+Ryzen側が再びhealthyになった場合は、自動的にRyzenへfailbackする。
+
+---
+
+#### Health Check
+
+障害判定にはCloudflare Load BalancerのHTTPS Monitorを使用する。
+
+単に`cloudflared`プロセスがCloudflareへ接続できることだけではなく、nginxまで正常に応答できることを確認する。
+
+両サーバーのnginxに以下のhealth check endpointを用意する。
 
 ```text
 /healthz
 ```
 
-Ryzen復旧後は主系へ戻す。
+正常時には以下を返す。
 
-ROCK 3Bは平常時のリバースプロキシとして使用しない。
+```text
+HTTP 200
+Body: ok
+```
+
+Health Monitorは概ね以下の条件とする。
+
+```text
+Protocol: HTTPS
+Method: GET
+Path: /healthz
+Expected Status: 200
+Expected Body: ok
+Host Header: Web公開hostname
+```
+
+Cloudflare Load BalancingのMonitorはHTTP status codeだけでなくresponse bodyも検証可能なため、単純なTCP接続確認よりもアプリケーションに近いレベルで正常性を判断する。
+
+必要に応じてMonitor専用HTTP headerを追加する。
+
+例:
+
+```text
+X-Health-Check: <secret>
+```
+
+nginx側では、このheaderを持つHealth Monitorからのリクエストにのみ`/healthz`を応答させる構成としてもよい。
+
+Webサイト自体をCloudflare Accessで保護する場合は、Health MonitorがAccess認証によって遮断されないよう、`/healthz`のみ別途Monitor用の経路を設ける。
+
+---
+
+#### 障害判定
+
+以下のいずれかにより`/healthz`への正常な応答が失われた場合、Ryzen側をunhealthyと判断する。
+
+```text
+Ryzen電源断
+Ryzen OS停止 / kernel panic
+ネットワーク断
+cloudflared停止
+nginx停止
+nginx設定異常
+Web公開経路の異常
+```
+
+これにより、単にTunnel connectionが存在するだけでWebサービスをhealthyとはみなさない。
+
+Health Monitorのinterval、timeout、retry、`consecutive_down`、`consecutive_up`は誤検知と切替時間のバランスを考慮して設定する。
+
+初期設定では、単発のpacket loss等でfailoverしないよう、複数回連続で失敗した場合にunhealthyとする。
+
+```text
+Healthy
+  ↓
+Health Check Failure
+  ↓
+再試行 / 連続失敗確認
+  ↓
+Primary Unhealthy
+  ↓
+ROCKへFailover
+```
+
+復旧時も同様に複数回の正常応答を確認してからRyzenをhealthyへ戻し、短時間の状態変化による頻繁な切り替えを防止する。
+
+---
+
+#### フェイルオーバー時の動作
+
+通常時:
+
+```text
+Client
+  ↓
+Cloudflare
+  ↓
+web-primary
+  ↓
+Ryzen Tunnel
+  ↓
+Ryzen nginx
+```
+
+Ryzen障害時:
+
+```text
+Client
+  ↓
+Cloudflare
+  ↓
+web-standby
+  ↓
+ROCK Tunnel
+  ↓
+ROCK nginx
+```
+
+Ryzen復旧時:
+
+```text
+Ryzen /healthz recovery
+  ↓
+Cloudflare Monitor detects healthy
+  ↓
+web-primary healthy
+  ↓
+automatic failback
+  ↓
+Ryzen nginx
+```
+
+ROCK 3Bは平常時の通信経路には介在しない。
+
+---
+
+#### Webコンテンツの整合性
+
+ROCK側には、Forgejo Actions RunnerによってRyzenと同時にデプロイされた最後の正常releaseを保持する。
+
+```mermaid
+flowchart LR
+    Runner["Actions Runner"]
+    Artifact["Web Artifact<br>release = commit hash"]
+
+    Ryzen["Ryzen"]
+    Rock["ROCK"]
+
+    Runner --> Artifact
+    Artifact --> Ryzen
+    Artifact --> Rock
+```
+
+フェイルオーバー機構はWebコンテンツの同期を行わない。
+
+コンテンツ同期はCI/CDの責務とし、Cloudflare Load Balancerは既にデプロイ済みのorigin間で通信先を切り替えることだけを担当する。
+
+---
+
+#### 両系統障害時
+
+RyzenとROCKの両方がunhealthyになった場合、正常なWeb提供は保証しない。
+
+Cloudflare Load Balancerではすべてのpoolがunhealthyの場合でもFallback Poolが最終的な転送先となるため、`web-standby`をFallback Poolとして設定する。
+
+ただしROCK自身も停止している場合、Webアクセス不能となることを許容する。
+
+これは以下のような状況を想定する。
+
+```text
+UPS停止
+ルーター故障
+ONU故障
+回線障害
+RyzenとROCKの同時故障
+```
+
+これらは本システムの冗長化対象外とする。
+
+---
+
+#### 障害試験
+
+構築後、以下の障害を意図的に発生させてfailoverを確認する。
+
+```text
+1. Ryzen nginx停止
+2. Ryzen cloudflared停止
+3. Ryzen Ethernet切断
+4. Ryzen shutdown
+5. Ryzen再起動・復旧
+```
+
+各試験について以下を確認する。
+
+```text
+Primaryがunhealthyになる
+        ↓
+ROCKへ切り替わる
+        ↓
+Webが閲覧可能
+        ↓
+Ryzen復旧
+        ↓
+Primaryがhealthyになる
+        ↓
+Ryzenへ自動failback
+```
+
+また、ROCK停止中でもRyzenの通常運用に一切影響しないことを確認する。
+
+---
+
+#### 実装上の前提
+
+Cloudflare Load BalancingはCloudflare Tunnelとは別のadd-on機能として使用する。
+
+2026年9月時点でCloudflareのBasic Load Balancingは月額課金のadd-onとして提供されている。
+
+この追加費用は、ROCKを常時proxyとして経由させずに、Cloudflare側でhealth check、failover、failbackを完結させるための運用コストとして許容する。
+
 
 ### 4.3 管理・ビルドネットワーク
 
@@ -370,6 +638,9 @@ flowchart LR
 ```
 
 RyzenとROCKで別々にbuildしない。
+
+ROCK停止中にROCKへのデプロイが失敗しても、その失敗は許容し、Ryzenへのデプロイと後続処理は継続する。
+ROCK復帰後も、明示的な命令がない限り自動同期は行わず、最後に正常デプロイされたWeb成果物を保持する。
 
 ### 5.4 リリース管理
 
@@ -847,9 +1118,11 @@ build
 
 完了条件:
 
-- 両ホストのrelease ID一致
+- 両ホストへのdeploy成功時はrelease ID一致
 - ROCK側で独立してWeb配信可能
 - 一方へのdeploy失敗を検出可能
+- ROCK停止中のdeploy失敗は許容し、Ryzenへのdeployと後続処理を継続する
+- ROCK復帰後も、明示的な命令がない限り自動同期しない
 
 ---
 
@@ -915,7 +1188,7 @@ Ryzen
 ## データ保全
 
 - Git repositoryがGitHubへmirrorされる。
-- WebはRyzenとROCKに同一releaseが存在する。
+- 両ホストへのデプロイ成功時は、Webの同一releaseが存在する。ROCK停止中のデプロイ失敗によるreleaseの不一致は許容し、復帰後も明示的な命令がない限り自動同期しない。
 - NVMe 1台故障時もRyzenを継続運用可能。
 
 ## 保守性
