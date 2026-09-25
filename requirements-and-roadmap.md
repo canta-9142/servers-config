@@ -99,7 +99,7 @@ ROCK 3BにはGitリポジトリのバックアップを保持しない。
 
 - CPU: AMD Ryzen 7 3700X
 - RAM: 16GB (年内までに32GBへアップグレード予定)
-- NVMe SSD: 500GB × 2, Btrfs RAID 1
+- NVMe SSD: 500GB × 2, mdadm RAID1 + ext4
 - OS: NixOS
 - ネットワーク: 有線Ethernet
 
@@ -117,14 +117,27 @@ ROCK 3BにはGitリポジトリのバックアップを保持しない。
 
 500GB NVMe SSD 2枚をミラー構成で使用する。
 
-基本案:
+採用構成:
 
-- Btrfs RAID1
+- Linux MD（mdadm）RAID1 + ext4
 - usable capacity: 約500GB
-- `compress=zstd`
-- 定期scrub
+- RAID metadata 1.2、internal write-intent bitmapを使用
+- 定期的なRAID整合性チェック（check）と結果のログ記録
 - SMART監視
 - 定期的なclean up
+
+RAIDメンバー管理と再同期はmdadmに任せ、ext4は単一のMDデバイス上に作成する。
+`/nix`と`/srv`は同じext4内の通常のディレクトリとし、LVMや容量の固定分割は追加しない。
+ファイルシステムのスナップショットと透過圧縮は使用しない。
+
+片方のSSDが欠損した場合も、残ったメンバーから自動で縮退起動する。
+起動時に`--force`で不整合メンバーを強制採用する構成にはしない。
+再参加・交換時は同期状態を確認し、再同期完了をもって冗長性の復旧とする。
+両メンバーを独立して更新した場合の自動統合は保証しない。
+
+各SSDに独立したFAT32のEFI System Partition（ESP）を配置し、両方から起動可能にする。
+ESPはMD RAIDに含めず、GRUBの`mirroredBoots`でOS更新時に両方の起動ファイルを更新する。
+縮退中のOS・bootloader更新は行わず、両ESPとRAIDの復旧後に実施する。
 
 想定領域:
 
@@ -137,7 +150,7 @@ ROCK 3BにはGitリポジトリのバックアップを保持しない。
 └── /srv/nix-cache
 ```
 
-kernel build treeやccacheなど、高頻度で書き換える領域については、必要に応じてBtrfs CoW無効化を検討する。
+kernel build treeやccacheもext4上に配置する。
 
 ---
 
@@ -876,7 +889,7 @@ monitoring
 Ryzen側:
 
 - SMART監視
-- Btrfs scrub
+- mdadm RAID整合性チェック、縮退状態・再同期状態の監視
 - Nix GC
 - Binary Cache retention
 - ディスク使用量監視
@@ -918,21 +931,32 @@ Ryzen機を組み立てる。
 
 NixOSを導入する。
 
+確定方針:
+
+- ディスク暗号化なし。
+- mdadm RAID1 + ext4を採用し、スナップショット・透過圧縮は使用しない。
+- SSD片方の故障時も自動で縮退起動を行う。各SSDに独立したUEFI起動領域を用意する。
+- LANアドレスはルーターのDHCP予約で固定する。
+- 管理SSHはCloudflare Mesh経由およびLAN内から許可する。
+- 障害検出は当面ログのみとし、通知は将来の監視UI導入時に再検討する。
+
 作業:
 
-- Btrfs RAID1構築
+- mdadm RAID1構築、ext4作成
 - NixOSインストール
 - SSH設定
-- Cloudflare Tunnel設定
+- Cloudflare Mesh設定（公開HTTP用Tunnelは後続Phase）
 - SMART監視
-- Btrfs scrub
+- mdadm RAID整合性チェックとログ記録
 - Nix GC
 
 完了条件:
 
 - reboot後も正常起動する。
-- 外部からCloudflare経由SSH可能。
+- どちらか片方のSSDが欠けた状態でも、手動操作なしで起動してSSH接続可能。
+- 外部からCloudflare Mesh経由SSH可能。LAN内SSHも可能。
 - RAID degraded状態を検出可能。
+- 縮退中の書き込み後、メンバーの再参加・再同期が成功し、データを維持して再起動できる。
 - NixOS configurationがGit管理されている。
 
 ---
