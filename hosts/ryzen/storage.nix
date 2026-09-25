@@ -16,6 +16,8 @@ let
 in
 {
   boot = {
+    kernelPackages = pkgs.linuxPackages_latest;
+
     swraid = {
       enable = true;
       # Match only our array UUID on the intended partitions. mdadm's
