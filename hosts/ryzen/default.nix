@@ -16,5 +16,7 @@
     firewall.enable = true;
   };
 
+  boot.blacklistedKernelModules = [ "nouveau" ];
+
   system.stateVersion = "26.05";
 }
