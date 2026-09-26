@@ -1,10 +1,10 @@
 # servers-config
 
 Ryzen主系サーバーと、将来移行するROCK 3B待機系のNixOS構成。
-現在の実装対象はPhase 1（Ryzen基盤）のみ。
+Phase 1（Ryzen基盤）は2026-09-27に完了。次はPhase 2（Nix Remote Builder）。
 
 - [要件・ロードマップ](requirements-and-roadmap.md)
-- [Ryzen初回インストール・受入確認](docs/phase-1-install.md)
+- [Ryzen SSD・RAID復旧手順](docs/ryzen-storage-recovery.md)
 
 ```text
 flake.nix
@@ -14,7 +14,7 @@ tests/raid-boot.nix     UEFI・縮退起動・メンバー再参加と再同期�
 ```
 
 `nixpkgs`は既存の`~/nixos-config`と同じrevisionから開始し、`flake.lock`で固定。
-ハードウェア設定は実機で生成し直す。それまでは一般的なRyzen/NVMe構成を使用する。
+Ryzenのハードウェア設定は実機で生成済み。通常起動・SSH・片側縮退起動と復旧を実機で確認した。
 ROCK 3Bの既存環境は変更しない。
 
 ## 開発・検証
