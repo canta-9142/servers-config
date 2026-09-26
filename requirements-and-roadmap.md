@@ -76,7 +76,7 @@ ROCK 3BにはGitリポジトリのバックアップを保持しない。
 - Forgejoは利用不能とする。
 - Actions Runnerは利用不能とする。
 - Nix Remote Builderは利用不能とする。
-- Nixクライアントはローカルビルドへフォールバックする。
+- Nixクライアントは手動指定でローカルビルドへ切り替える。
 - Nix Binary Cacheは利用不能でも許容する。
 
 #### ROCK 3Bのみ停止
@@ -556,7 +556,7 @@ flowchart LR
     Mesh --> Ryzen
 ```
 
-Ryzenが利用不能な場合、NixクライアントはROCK 3Bへ切り替えず、ローカルビルドへフォールバックする。
+Ryzenが利用不能な場合、NixクライアントはROCK 3Bへ切り替えず、手動指定でローカルビルドへ切り替える。
 
 ### 4.4 Git通信
 
@@ -722,18 +722,51 @@ flowchart LR
     Result --> Laptop
 ```
 
-Ryzenが利用不能な場合:
+### 8.1 通常時の実行方針
 
-- クライアントはローカルビルドへフォールバックする。
+通常のビルドは原則としてRyzenへ全委譲する。
+クライアントの`nix.settings.max-jobs = 0`とし、ローカルとの並列分散は行わない。
+flakeの評価、成果物の取得、およびNixがローカル実行を必要とする処理までRyzenへ移すことは要件に含めない。
+既存のBinary Cacheから取得できる成果物は通常どおり利用する。
+
+クライアント側（`~/nixos-config`）:
+
+- `nix.distributedBuilds = true`
+- `nix.buildMachines`でRyzenを登録し、`ssh-ng`で接続する。
+- `nix.settings.builders-use-substitutes = true`として、Ryzenが依存成果物を自身で取得する。
+- 接続先はCloudflare Mesh上のRyzenに一本化し、LANへの自動切替は追加しない。
+- 対象は`x86_64-linux`とする。
+
+Ryzen側（`~/servers-config`）:
+
+- SSH接続用の専用ユーザー`nix-builder`を作成し、SSHの許可ユーザーに追加する。
+- `nix-builder`をNixの`trusted-users`へ登録する。専用ユーザーはNixに対する低権限の隔離境界とはみなさない。
+- `big-parallel`を有効化し、`kvm`は実機で利用可能と確認した場合に宣言する。
+- 16GB RAMでの初期値は、クライアントの`buildMachines`の`maxJobs = 1`、Ryzenの`max-jobs = 1`、`cores = 8`とする。
+- 並列度は大規模ビルドの実測で調整する。これらはメモリ使用量の上限を保証する設定ではない。
+- Runnerやカーネル開発とのリソース競合は、それぞれの導入時に再検討する。
+
+### 8.2 SSH鍵の管理
+
+- 管理用SSH鍵とは別に、クライアント専用のビルド用鍵を用意する。
+- 秘密鍵はクライアントの既存sops-nixで管理し、Nix daemon（root）が非対話で利用できる権限で配備する。
+- 平文の秘密鍵をGitやNix Storeへ格納しない。
+- Ryzenには公開鍵のみ登録し、クライアントには信頼できる経路で確認したRyzenのSSHホスト公開鍵を固定する。
+
+### 8.3 Ryzen停止時の動作
+
+- 自動でローカル実行へ切り替える仕組みはPhase 2では導入しない。
+- 開始時に接続できない場合も、ビルド途中で切断した場合も、実行の失敗を許容する。
+- 利用者が次のようにコマンド単位でローカル実行を指定して再実行する。
+
+```sh
+nix build --builders '' --max-jobs 1 <installable>
+```
+
+- 切替のためのNixOS設定変更や再適用は不要とする。
+- ビルド途中の処理状態の引き継ぎは保証しない。
 - ROCK 3Bをx86_64 buildの代替として使用しない。
-
-Ryzen側では以下を有効化する。
-
-- distributed build
-- SSH経由builder
-- `big-parallel`
-- 必要に応じて `kvm`
-- `builders-use-substitutes`
+- Ryzen復旧後は、上記の上書き指定を外した通常のコマンドで再びRyzenへ委譲する。
 
 ---
 
@@ -968,26 +1001,34 @@ SSDの再参加・交換と起動領域の復旧は[復旧手順](docs/ryzen-sto
 
 ## Phase 2: Nix Remote Builder
 
+状態: **仕様確定（2026-09-27）、未実装**。
+
 RyzenをRemote Builder化する。
+設定方針は第8節に従い、通常は原則全委譲、障害時は手動でローカル実行へ切り替える。
 
 作業:
 
 - build専用ユーザー作成
-- SSH key設定
-- `nix.buildMachines`
-- distributed builds
-- builders-use-substitutes
+- 専用SSH鍵のsops-nix管理とRyzenのホスト公開鍵固定
+- クライアントの`nix.buildMachines`、distributed builds、`builders-use-substitutes`設定
+- 通常時のローカルビルド無効化とRyzenの初期並列度設定
+- 手動でのローカル実行手順の整備
 
 テスト:
 
-- 小規模package
-- 大規模package
-- NixOS configuration
+- rootとして専用鍵によるMesh経由の非対話接続とホスト鍵検証
+- キャッシュ取得のみで終わらない小規模packageのリモートビルド
+- 大規模packageのリモートビルドとメモリ使用量の確認
+- NixOS configurationのビルド（実機への適用は含めない）
+- Ryzenへ接続できない状態での失敗と、手動指定によるローカルビルド
+- ビルド途中の接続断での失敗と、ローカルでの再実行
+- Ryzen復旧後、通常のコマンドでリモートビルドへ戻ること
 
 完了条件:
 
-- クライアントの`nix build`がRyzenで実行される。
-- Ryzen停止時にローカルビルド可能。
+- 通常の`nix build`が必要とするビルドを原則Ryzenで実行し、ログで委譲を確認できる。
+- Ryzen停止時に`--builders '' --max-jobs 1`の指定でローカルビルド可能。
+- 途中切断後も手動で再実行でき、透過的な自動再実行は要求しない。
 
 ---
 
@@ -1211,7 +1252,7 @@ Ryzen
 - Forgejo停止は許容。
 - Runner停止は許容。
 - Remote Build停止は許容。
-- Nix clientがlocal build可能。
+- Nix clientが手動指定でlocal build可能（自動切替は要求しない）。
 - Binary Cache停止は許容。
 
 ## データ保全
