@@ -18,8 +18,11 @@
   security.sudo.wheelNeedsPassword = true;
 
   environment.systemPackages = with pkgs; [
+    nh
     git
+    gh
     vim
+    micro
     btop
     nvme-cli
   ];
