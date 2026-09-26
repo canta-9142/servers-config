@@ -18,5 +18,7 @@
 
   boot.blacklistedKernelModules = [ "nouveau" ];
 
+  environment.sessionVariables.NH_FLAKE = "/home/jinji/servers-config#ryzen";
+
   system.stateVersion = "26.05";
 }

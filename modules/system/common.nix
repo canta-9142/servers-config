@@ -1,5 +1,7 @@
 { pkgs, ... }:
 {
+  imports = [ ./fish.nix ];
+
   nix.settings.experimental-features = [
     "nix-command"
     "flakes"
@@ -8,6 +10,7 @@
 
   users.users.jinji = {
     isNormalUser = true;
+    shell = pkgs.fish;
     extraGroups = [ "wheel" ];
     # Same public key as the existing ROCK 3B configuration.
     openssh.authorizedKeys.keys = [
