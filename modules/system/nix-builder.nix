@@ -12,8 +12,8 @@
   services.openssh.settings.AllowUsers = [ "nix-builder" ];
   nix.settings = {
     trusted-users = [ "nix-builder" ];
-    max-jobs = 1;
-    cores = 8;
+    max-jobs = "auto";
+    cores = 15;
     extra-system-features = [ "big-parallel" ];
   };
 }
