@@ -7,6 +7,7 @@
     ../../modules/system/ssh.nix
     ../../modules/system/cloudflare-mesh.nix
     ../../modules/system/maintenance.nix
+    ../../modules/system/nix-builder.nix
   ];
 
   networking = {

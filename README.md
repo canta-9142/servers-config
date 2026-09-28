@@ -4,6 +4,7 @@ Ryzen主系サーバーと、将来移行するROCK 3B待機系のNixOS構成。
 
 - [要件・ロードマップ](requirements-and-roadmap.md)
 - [Ryzen SSD・RAID復旧手順](docs/ryzen-storage-recovery.md)
+- [Nix Remote Builderの適用・運用手順](docs/nix-remote-builder.md)
 
 ```text
 flake.nix
