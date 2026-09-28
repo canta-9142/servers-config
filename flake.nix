@@ -24,8 +24,7 @@
       };
       formatter.${system} = pkgs.nixfmt-tree;
       checks.${system} = {
-        raid-boot = import ./tests/raid-boot.nix { inherit pkgs; };
-        nix-builder = import ./tests/nix-builder.nix { inherit pkgs; };
+        forgejo = import ./tests/forgejo.nix { inherit pkgs; };
       };
     };
 }

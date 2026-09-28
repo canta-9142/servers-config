@@ -1074,6 +1074,15 @@ Phase 3は完了扱いにはせず、次はPhase 4（Forgejo移行）へ進む�
 
 ## Phase 4: Forgejo移行
 
+状態: **Ryzen設定追加、実機への適用・データ移行待ち**。
+
+Forgejo 16.0.5 / SQLiteを維持し、保存先を`/srv/forgejo`、Web URLを
+`https://git.floating-gate.com/`、Git SSHをMesh上の`ryzen.home.arpa:2222`とする。
+移行完了マーカーと既存DB・鍵が揃うまで起動を抑止する。
+Ryzen専用Tunnelは未作成。UUID・認証JSONの配置とDNS登録は公開前に行う。
+GitHub push mirrorの最終同期成功を確認済みで、移行中の一時停止は許容する。
+具体的な手順は[Forgejo移行手順](docs/forgejo-migration.md)にまとめる。
+
 既存ForgejoをRyzenへ移行する。
 
 作業:
