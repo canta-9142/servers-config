@@ -27,6 +27,7 @@
     gh
     vim
     micro
+    tree
     btop
     nvme-cli
   ];
