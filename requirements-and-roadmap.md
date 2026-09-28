@@ -1039,6 +1039,14 @@ RyzenをRemote Builder化する。
 
 ## Phase 3: Kernel Build Environment
 
+状態: **当面スキップ（2026-09-28）**。
+
+主な用途は、laptopで使用するAX210用パッチ付きカーネルの`nixos-rebuild`による更新。
+Ryzenへ委譲してもカーネル全体の再ビルドに長時間かかることを避けたい一方、
+以下の手動ビルド環境だけでは通常の`nixos-rebuild`の高速化には直結しないため、現時点では導入を見送る。
+公式カーネルとパッチ付きWi-Fiモジュールの単体ビルドを組み合わせる方式は候補とし、実装・実機検証は未実施。
+Phase 3は完了扱いにはせず、次はPhase 4（Forgejo移行）へ進む。以下は再検討時の作業案として残す。
+
 カーネル高速ビルド環境を構築する。
 
 作業:
@@ -1277,14 +1285,14 @@ Ryzen
 
 # 15. 実装優先順位
 
-優先順位は以下とする。
+優先順位は以下とする。Phase 3は当面スキップし、Kernel Build Environmentの導入を待たずにForgejo移行へ進む。
 
 ```text
 Ryzen基盤
   ↓
 Nix Remote Builder
   ↓
-Kernel Build Environment
+Kernel Build Environment（Phase 3: 当面スキップ）
   ↓
 Forgejo
   ↓
