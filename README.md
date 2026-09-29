@@ -6,9 +6,12 @@ Ryzen主系サーバーと、将来移行するROCK 3B待機系のNixOS構成。
 - [Ryzen SSD・RAID復旧手順](docs/ryzen-storage-recovery.md)
 - [Nix Remote Builderの適用・運用手順](docs/nix-remote-builder.md)
 - [Forgejoの移行・公開手順](docs/forgejo-migration.md)
+- [Actions Runnerの登録・Web CI確認手順](docs/forgejo-runner.md)
 
 Phase 4のForgejo移行は2026-09-29に実用上完了。ROCK本体停止試験は未実施、
-ROCK側の設定整理は保留とし、次はPhase 5のActions Runner移行へ進む。
+ROCK側の設定整理は保留。
+Phase 5はRyzen RunnerでWebビルドとCI失敗時の本番維持を確認済み。
+workflowは`floating-gate`の`phase5-ci`ブランチにあり、main統合はPhase 6で行う。
 
 ```text
 flake.nix

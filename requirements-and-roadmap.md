@@ -1104,6 +1104,16 @@ laptopのSSH恒久設定は`~/nixos-config`の`93f5be4`でコミット済み（O
 
 ## Phase 5: Actions Runner
 
+状態: **実機適用・Runner登録・Web CI受入完了（2026-09-29）、workflowのmain統合待ち**。
+
+`~/Projects/floating-gate`を対象に、Podman上のNode 22でWebビルドを行う。
+既存デプロイjobとはRunnerラベルを分け、公開ディレクトリへの書き込み権限を付与しない。
+Nix build用workflowは現時点では不要のため、今回の作業・完了条件から除外する。
+登録と受入確認は[Actions Runner手順](docs/forgejo-runner.md)にまとめる。
+`phase5-ci`ブランチでWebビルド成功、意図的なCI失敗時の本番release維持、復旧後の再成功を確認した。
+Podman 5.8.7との互換性のためNode 22 Alpineを使い、ブリッジのDNS通信を許可する。
+workflowの`main`統合は、既存deploy workflowを整理するPhase 6で行う。
+
 RyzenにForgejo Actions Runnerを配置する。
 
 作業:
@@ -1127,7 +1137,7 @@ build
 完了条件:
 
 - Web build成功
-- Nix build成功
+- Nix buildは今回スキップ（workflowが必要になった時点で追加）
 - CI失敗時に本番環境へ影響しない
 
 ---
