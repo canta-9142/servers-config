@@ -7,6 +7,9 @@ Ryzen主系サーバーと、将来移行するROCK 3B待機系のNixOS構成。
 - [Nix Remote Builderの適用・運用手順](docs/nix-remote-builder.md)
 - [Forgejoの移行・公開手順](docs/forgejo-migration.md)
 
+Phase 4のForgejo移行は2026-09-29に実用上完了。ROCK本体停止試験は未実施、
+ROCK側の設定整理は保留とし、次はPhase 5のActions Runner移行へ進む。
+
 ```text
 flake.nix
 hosts/ryzen/           ホスト設定・ディスク・ハードウェア

@@ -7,9 +7,9 @@
 let
   cfg = config.services.forgejo;
   readyFile = "${cfg.stateDir}/.migration-ready";
-  # Set the UUID of a NEW locally managed Ryzen tunnel before publishing.
+  # Locally managed tunnel: ryzen-homelab.
   # Never reuse the ROCK tunnel: it also carries the existing website and SSH.
-  tunnelId = null;
+  tunnelId = "aa088497-b776-4cb2-989e-935dc02ed6b3";
 in
 {
   services.forgejo = {

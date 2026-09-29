@@ -1074,30 +1074,31 @@ Phase 3は完了扱いにはせず、次はPhase 4（Forgejo移行）へ進む�
 
 ## Phase 4: Forgejo移行
 
-状態: **Ryzen設定追加、実機への適用・データ移行待ち**。
+状態: **移行完了（2026-09-29）、ROCK本体停止試験のみ未実施**。
 
 Forgejo 16.0.5 / SQLiteを維持し、保存先を`/srv/forgejo`、Web URLを
-`https://git.floating-gate.com/`、Git SSHをMesh上の`ryzen.home.arpa:2222`とする。
-移行完了マーカーと既存DB・鍵が揃うまで起動を抑止する。
-Ryzen専用Tunnelは未作成。UUID・認証JSONの配置とDNS登録は公開前に行う。
-GitHub push mirrorの最終同期成功を確認済みで、移行中の一時停止は許容する。
-具体的な手順は[Forgejo移行手順](docs/forgejo-migration.md)にまとめる。
+`https://git.floating-gate.com/`、Git SSHをMesh上の`ryzen.home.arpa:2222`へ変更した。
+ROCKのForgejo・Runner・dumpを停止してデータを移し、Ryzenで起動・公開した。
+専用Tunnel `ryzen-homelab` の認証JSON配置・DNS登録も完了。
+新URLでのログイン・リポジトリ表示、SSHでのclone/push/pull、GitHub push mirror成功を確認した。
+定期dumpの作成成功と毎日03:30の実行予約も確認済み。
 
-既存ForgejoをRyzenへ移行する。
+laptopのSSH恒久設定は`~/nixos-config`の`93f5be4`でコミット済み（OSへの適用完了は未確認）。
+既存リポジトリ`~/Projects/floating-gate`のoriginも新SSH URLへ変更し、参照取得を確認した。
+詳細と再移行時の手順は[Forgejo移行手順](docs/forgejo-migration.md)にまとめる。
 
-作業:
+完了条件の確認状況:
 
-- Forgejoインストール
-- repository移行
-- DB移行
-- SSH/HTTP確認
-- GitHub mirror設定
+- [x] clone/push/pull成功
+- [x] GitHub mirror成功
+- [ ] ROCK本体の停止状態でもForgejo利用可能（未試験）
 
-完了条件:
+残件の扱い:
 
-- clone/push/pull成功
-- GitHub mirror成功
-- ROCK停止状態でもForgejo利用可能
+- ROCK側の自動起動無効化・設定整理は利用者の方針で保留。サービスの停止と本体停止は区別する。
+- 既存Runnerの接続先更新・再開は未実施。RyzenへのRunner移行はPhase 5で行う。
+- 定期dumpからの復元確認と別ホストへの暗号化バックアップは保守課題として残す。
+- 実用上の移行は完了とし、上記を記録したうえでPhase 5へ進む。
 
 ---
 

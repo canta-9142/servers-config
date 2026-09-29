@@ -1,8 +1,36 @@
 # Forgejo移行（Phase 4）
 
 設定は `hosts/ryzen/forgejo.nix`。Forgejo 16.0.5 / SQLiteを維持して
-ROCKの `/var/lib/forgejo` をRyzenの `/srv/forgejo` へ移す。
-この設定の追加・ビルドだけでは実機への適用、データ移行、DNS変更は行われない。
+ROCKの `/var/lib/forgejo` をRyzenの `/srv/forgejo` へ移行済み。
+
+## 実施結果（2026-09-29）
+
+**実用上のPhase 4移行は完了。受入条件のうちROCK本体停止試験のみ未実施。**
+
+- RyzenへのNixOS設定適用、Tunnel認証JSON配置、停止コピーによるデータ復元を実施。
+- Forgejoのactive状態とAPIのバージョン`16.0.5`を確認。
+- `git.floating-gate.com`を公開し、既存アカウントでのログイン・リポジトリ表示を確認。
+- Mesh経由のGit SSH認証、clone/push/pull、GitHub push mirrorの同期成功を確認。
+- 定期dumpは`Result=success`、`ExecMainStatus=0`。
+  `forgejo-dump-1790664217.tar.zst`（約11MB、9月29日15:43）を作成し、
+  次回9月30日03:30 JSTの実行予約を確認。
+
+laptop側では`~/nixos-config`の`93f5be4`で、Forgejoのホスト公開鍵固定と
+Mesh接続用の個人鍵指定をコミットした。生成したSSH設定・固定公開鍵で参照取得に成功。
+NixOSへの適用完了は未確認。
+Forgejoをoriginに持つ既存リポジトリ`~/Projects/floating-gate`は、
+`ssh://git@ryzen.home.arpa:2222/jinji/floating-gate.git`へ変更済み。
+
+未実施・保留事項:
+
+- ROCK本体停止中のWeb・Git利用試験。確認済みなのはROCKのForgejo等を停止した状態での利用。
+- ROCK側の自動起動無効化・設定整理は利用者の方針で保留。
+  停止操作だけでは再起動後の起動を防げないため、旧Forgejoの二重稼働に注意する。
+- ROCKの既存Runnerは停止したまま、接続先更新・再開は未実施。Runner移行はPhase 5へ引き継ぐ。
+- 定期dumpからの復元試験と別ホストへの暗号化バックアップ。
+  今回復元した停止コピーのアーカイブと、定期dumpは別のバックアップである。
+
+以下は移行手順の記録。現在稼働中の`/srv/forgejo`へ古いデータを上書きしない。
 
 | 項目 | 移行後 |
 | --- | --- |
@@ -21,16 +49,11 @@ Cloudflare Access SSH用のProxyCommandは使用しない。
 
 ## 1. Tunnelを準備する
 
-既存ROCKのTunnel UUIDを再利用しない。手元で新しいlocally managed Tunnelを作成する。
+Ryzen専用のlocally managed Tunnel `ryzen-homelab` は作成済み。
+UUIDは `aa088497-b776-4cb2-989e-935dc02ed6b3` で、設定ファイルに反映済み。
+既存ROCKのTunnel UUIDは再利用しない。以下の `<UUID>` はこの値に置き換える。
 必要な一時ツールは `nix shell nixpkgs#cloudflared` で利用できる。
-
-```sh
-cloudflared tunnel login
-cloudflared tunnel create forgejo-ryzen
-```
-
-発行されたUUIDを設定ファイルの `tunnelId = null;` に文字列で設定する。
-`null` の間はTunnelサービスは生成されない。認証JSONやアカウント証明書はGitへ追加しない。
+認証JSONやアカウント証明書はGitへ追加しない。
 Ryzenに専用の `<UUID>.json` をroot所有・0600で
 `/var/lib/cloudflared/<UUID>.json` として配置する（親ディレクトリは0700）。
 `cert.pem` はRyzenの実行用には不要。認証JSONはsystemdのLoadCredentialで渡す。
@@ -61,7 +84,7 @@ nixos-rebuild switch --flake ~/servers-config#ryzen \
 dumpサービス・タイマーは起動しない。先に空のインスタンスを作らないための仕組み。
 マーカーだけ作っても、移行元のDBと必須の鍵ファイルが不足していれば起動は失敗する。
 
-## 3. ROCKを停止してコピーする
+## 3. ROCKのサービスを停止してコピーする
 
 Actionsの実行が終了したことを確認し、以降は移行完了までpushやUIでの更新を止める。
 ROCKでRunner、dumpタイマー・サービス、Forgejoの順に停止する。
@@ -109,7 +132,7 @@ tmpfilesでARM版の `conf/locale` リンクをRyzen版へ置き換える。
 起動時にapp.iniとGit hooksはNixOSモジュールが再生成する。
 既存のsecret_key、各JWT秘密鍵、internal_token、SSHホスト鍵は保持する。
 
-ROCKが停止したままであることと、コピーの完了を確認してからマーカーを作る。
+ROCKのForgejoが停止したままであることと、コピーの完了を確認してからマーカーを作る。
 
 ```sh
 sudo install -o root -g root -m 600 /dev/null /srv/forgejo/.migration-ready
@@ -144,19 +167,19 @@ Cloudflare Accessを使用する場合は新hostname用のポリシーも用意�
 git remote set-url origin ssh://git@ryzen.home.arpa:2222/jinji/<repo>.git
 ```
 
-既存Runnerは停止したまま接続先を更新し、再開する。
+既存RunnerをROCKで再開する場合は、停止したまま接続先を更新してから再開する。
 ROCK上のlocalhost:3000は移行後には利用できない。
 Runnerの登録状態が引き継がれているか確認し、必要な場合だけ再登録する。
-Runnerの移設はPhase 5で行う。
+今回はROCK側の変更を保留し、Runnerの移設をPhase 5で行う。
 
 Ryzenで `sudo systemctl start forgejo-dump.timer` を実行し、dumpと復元を検証する。
 定期dumpは稼働中に取得するため、今回の停止コピーと同じ整合性を保証しない。
 DB・Git・LFSを同一時点で復元する必要がある場合は停止バックアップを取る。
 別ホストへの暗号化バックアップは保存先が未定のため未実装。
 
-ROCK側ではForgejoとdumpの自動起動をNixOS設定から無効化する。
+ROCK側の設定整理を再開する際は、Forgejoとdumpの自動起動をNixOS設定から無効化する。
 既存Tunnelは管理SSH・Webサイトにも使われるため停止しない。
-ROCK停止中のForgejo利用を確認してPhase 4の受入を完了する。
+ROCK本体停止中のForgejo利用試験は残る受入条件として追跡する。
 
 ## 切り戻し
 
