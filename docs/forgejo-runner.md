@@ -1,5 +1,9 @@
 # Actions Runner（Phase 5）
 
+以下はPhase 5時点の構成・受入記録。
+Phase 6でサイト領域のvolume許可と本番workflowを追加した。
+現在の適用手順・権限の前提は[Webデプロイ手順](web-deployment.md)を参照。
+
 Ryzenの`hosts/ryzen/runner.nix`でWebビルド専用Runnerを構成する。
 対象は`~/Projects/floating-gate`の`.forgejo/workflows/build.yml`。
 Nix build用workflowは今回スキップし、本番デプロイはPhase 6で追加する。

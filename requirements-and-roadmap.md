@@ -1104,7 +1104,7 @@ laptopのSSH恒久設定は`~/nixos-config`の`93f5be4`でコミット済み（O
 
 ## Phase 5: Actions Runner
 
-状態: **実機適用・Runner登録・Web CI受入完了（2026-09-29）、workflowのmain統合待ち**。
+状態: **完了（2026-09-29）。workflowのmain統合もPhase 6で完了**。
 
 `~/Projects/floating-gate`を対象に、Podman上のNode 22でWebビルドを行う。
 既存デプロイjobとはRunnerラベルを分け、公開ディレクトリへの書き込み権限を付与しない。
@@ -1112,7 +1112,7 @@ Nix build用workflowは現時点では不要のため、今回の作業・完了
 登録と受入確認は[Actions Runner手順](docs/forgejo-runner.md)にまとめる。
 `phase5-ci`ブランチでWebビルド成功、意図的なCI失敗時の本番release維持、復旧後の再成功を確認した。
 Podman 5.8.7との互換性のためNode 22 Alpineを使い、ブリッジのDNS通信を許可する。
-workflowの`main`統合は、既存deploy workflowを整理するPhase 6で行う。
+workflowの`main`統合は、既存deploy workflowを整理したPhase 6で完了した。
 
 RyzenにForgejo Actions Runnerを配置する。
 
@@ -1144,6 +1144,22 @@ build
 
 ## Phase 6: Ryzen Web Deployment
 
+状態: **完了（2026-09-29）**。
+
+既存のROCK用nginx構成とサイト側`deploy.sh`を再利用する。
+Ryzenに`/srv/www/floating-gate`と`/healthz`、既存TunnelへのWeb ingressを追加した。
+既存Runnerのvolume許可をサイト領域に限定し、本番jobでのみマウントする。
+サイト側workflowはAlpine対応・新Forgejo URL・Ryzen Runnerへ更新し、mainの二重ビルドを除いた。
+適用順序と切戻しは[Webデプロイ手順](docs/web-deployment.md)を参照。
+サイトの`9dbfeb7`をmainへpushし、[CI #77](https://git.floating-gate.com/jinji/floating-gate/actions/runs/77)が成功。
+Ryzenの`current`が同commitを指し、`/healthz`が200 / ok、HTTP本文と公開ファイルのハッシュ一致を確認した。
+DNS切替後の公開アクセスを確認済み。
+[CI #78](https://git.floating-gate.com/jinji/floating-gate/actions/runs/78)で意図的にビルドを失敗させ、
+旧release・HTTP本文・公開healthzの維持を確認した。
+試験変更をrevertした`557c62c`の[CI #79](https://git.floating-gate.com/jinji/floating-gate/actions/runs/79)は成功し、
+新releaseへの切替と公開サイトの正常応答を確認した。
+途中状態の非公開は隔離環境のコピー途中・失敗試験とnginx VM試験でも確認済み。
+
 RyzenへのWeb自動デプロイを構築する。
 
 作業:
@@ -1155,9 +1171,9 @@ RyzenへのWeb自動デプロイを構築する。
 
 完了条件:
 
-- Git pushから本番反映まで自動化
-- build失敗時は既存release維持
-- deploy途中状態が公開されない
+- [x] Git pushから本番反映まで自動化
+- [x] build失敗時は既存release維持
+- [x] deploy途中状態が公開されない
 
 ---
 

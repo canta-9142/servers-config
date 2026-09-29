@@ -25,6 +25,7 @@
       formatter.${system} = pkgs.nixfmt-tree;
       checks.${system} = {
         forgejo = import ./tests/forgejo.nix { inherit pkgs; };
+        web = import ./tests/web.nix { inherit pkgs; };
       };
     };
 }

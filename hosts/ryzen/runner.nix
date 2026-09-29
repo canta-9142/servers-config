@@ -27,7 +27,9 @@
           privileged = false;
           # WARP's loopback DNS is host-only; jobs only need public DNS.
           options = "--memory=4g --cpus=2 --dns=1.1.1.1 --dns=1.0.0.1";
-          valid_volumes = [ ];
+          # Only the production workflow requests this mount. Workflow authors
+          # in this trusted repository consequently have production write access.
+          valid_volumes = [ "/srv/www/floating-gate" ];
           # Use the host runtime without exposing its socket to jobs.
           docker_host = "-";
         };
