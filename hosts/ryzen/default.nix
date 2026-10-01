@@ -6,6 +6,7 @@
     ./forgejo.nix
     ./runner.nix
     ./web.nix
+    ./kernel-build.nix
     ../../modules/system/common.nix
     ../../modules/system/ssh.nix
     ../../modules/system/cloudflare-mesh.nix

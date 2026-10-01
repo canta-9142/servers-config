@@ -841,6 +841,8 @@ flowchart LR
 
 基本方針:
 
+- 最初に、Nix経由のパッチ付きカーネルビルドでRyzen上の永続ccacheを利用できるようにする。
+- 手動の開発ループ用環境は、カーネルパッチの反復開発が必要になった段階で追加する。
 - `make O=/srv/kernel/build`
 - `-j16`
 - ccache利用
@@ -1039,36 +1041,40 @@ RyzenをRemote Builder化する。
 
 ## Phase 3: Kernel Build Environment
 
-状態: **当面スキップ（2026-09-28）**。
+状態: **再開方針確定（2026-09-30）、実装・実機検証は未実施**。
 
-主な用途は、laptopで使用するAX210用パッチ付きカーネルの`nixos-rebuild`による更新。
-Ryzenへ委譲してもカーネル全体の再ビルドに長時間かかることを避けたい一方、
-以下の手動ビルド環境だけでは通常の`nixos-rebuild`の高速化には直結しないため、現時点では導入を見送る。
-公式カーネルとパッチ付きWi-Fiモジュールの単体ビルドを組み合わせる方式は候補とし、実装・実機検証は未実施。
-Phase 3は完了扱いにはせず、次はPhase 4（Forgejo移行）へ進む。以下は再検討時の作業案として残す。
+当面の目的は、laptopで使用するAX210用パッチ付きカーネルの`nixos-rebuild`に伴う再ビルドの高速化。
+将来はROCK 3B向けなど、Wi-Fiモジュール以外のカーネル本体へのパッチも想定する。
+2026-09-28には手動ビルド環境だけでは通常の`nixos-rebuild`の高速化に直結しないため保留したが、
+今回はNix経由のカーネルビルドでRyzen上の永続ccacheを利用する構成から着手する。
+公式カーネルとパッチ付きWi-Fiモジュールの単体ビルドを組み合わせる方式は代替案として残す。
 
-カーネル高速ビルド環境を構築する。
+初期作業:
 
-作業:
+- Ryzen上に永続ccache領域を用意し、容量上限とビルドユーザーのアクセス権限を設定する。
+- 対象カーネルにccacheラッパーを適用し、Nix sandboxからキャッシュを利用できるようにする。
+- laptopのパッチ付きカーネルをRyzenへ委譲する構成に組み込む。
+- ビルド時間とccache統計の確認手順を整備する。
 
-- Linux source配置
-- `O=` build directory
-- ccache
-- build script
-- 必要なtoolchain
+受入試験:
 
-テスト:
+1. キャッシュ未蓄積時のカーネルビルド成功と所要時間を確認する。
+2. 小さなパッチ変更で別derivationを生成して再ビルドし、ccacheのヒット率と所要時間を比較する。
+3. 変更したパッチが成果物に反映されることを確認する。
+4. laptopへ適用し、起動とAX210の動作を確認する。
 
-1. full build
-2. 1ファイル修正
-3. incremental build
-4. パッチ適用
-5. kernel生成
+初期完了条件:
 
-完了条件:
+- `nixos-rebuild`で利用するパッチ付きカーネルをRyzenでビルドできる。
+- パッチ変更後の再ビルドでccacheのヒットと所要時間の短縮を確認できる。
+- パッチの反映、laptopの起動とAX210の動作を確認できる。
 
-- 差分コンパイルが機能する。
-- Nix buildを介さず高速な開発ループが成立する。
+後続拡張（初期完了条件には含めない）:
+
+- 反復開発用のLinux source、永続`O=` build directory、build scriptとtoolchainを用意する。
+- full build、1ファイル修正後の差分ビルド、パッチ適用後のkernel生成を確認する。
+- ROCK 3B向けarm64カーネルのビルド方式を選定し、必要に応じてRyzen上のクロスコンパイル環境を追加する。
+- x86_64とarm64それぞれでccacheの効果を検証する。異なるターゲット間のキャッシュ再利用は前提にしない。
 
 ---
 
@@ -1321,20 +1327,22 @@ Ryzen
 
 # 15. 実装優先順位
 
-優先順位は以下とする。Phase 3は当面スキップし、Kernel Build Environmentの導入を待たずにForgejo移行へ進む。
+Phase 4〜6の実用到達を経て、次はPhase 3を再開する。
+まずNix経由のパッチ付きカーネルビルドへのccache導入を進め、その後はPhase 7以降へ進む。
+Phase 3の手動開発環境とarm64対応は、必要になった段階で追加する。
 
 ```text
 Ryzen基盤
   ↓
 Nix Remote Builder
   ↓
-Kernel Build Environment（Phase 3: 当面スキップ）
-  ↓
 Forgejo
   ↓
 Actions Runner
   ↓
 Ryzen Web Deployment
+  ↓
+Kernel Build Environment（Phase 3再開: Nixビルドへのccache導入）
   ↓
 Nix Binary Cache
   ↓
