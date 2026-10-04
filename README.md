@@ -5,6 +5,7 @@ Ryzen主系サーバーと、将来移行するROCK 3B待機系のNixOS構成。
 - [要件・ロードマップ](requirements-and-roadmap.md)
 - [Ryzen SSD・RAID復旧手順](docs/ryzen-storage-recovery.md)
 - [Nix Remote Builderの適用・運用手順](docs/nix-remote-builder.md)
+- [Nix Binary Cache・12時間ごとの更新計画](docs/nix-binary-cache.md)
 - [Forgejoの移行・公開手順](docs/forgejo-migration.md)
 - [Actions Runnerの登録・Web CI確認手順](docs/forgejo-runner.md)
 - [Ryzen Webデプロイ・公開切替手順](docs/web-deployment.md)

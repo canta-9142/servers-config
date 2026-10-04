@@ -774,6 +774,13 @@ nix build --builders '' --max-jobs 1 <installable>
 
 Binary CacheはRyzen上で提供する。
 
+運用方針の詳細は[Binary Cache運用計画](docs/nix-binary-cache.md)を参照。
+`~/nixos-config`の正本をRyzenのForgejoへ移し、Ryzenで12時間ごとに
+flake inputsを更新してlaptop構成全体をビルドする。
+システムのclosureをキャッシュへ公開した後、成功した更新コミットだけをpushする。
+laptopはCI成功を確認してpullし、原則`--update`なしで`nh os switch`する。
+設定変更のpushもCIでビルド・公開する。これらはPhase 7で導入する計画であり、未実施。
+
 目的:
 
 - CIで事前buildした成果物の再利用
@@ -1194,10 +1201,15 @@ Binary Cacheを導入する。
 - クライアント設定
 - CI連携
 - retention設定
+- `nixos-config`の正本をForgejoへ移行
+- 12時間ごとのlock更新・laptop構成の事前ビルド・キャッシュ公開後のpush
+- 設定変更push時のlaptop構成ビルド・公開
 
 完了条件:
 
 - CI成果物を他端末が取得可能
+- 同じコミットのlaptop構成をfish completionsも含めて取得可能
+- 定期更新失敗時に更新コミットを公開せず、前回成功分を維持
 - Cache停止時も通常build可能
 
 ---
