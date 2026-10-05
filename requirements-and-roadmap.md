@@ -1194,6 +1194,11 @@ RyzenへのWeb自動デプロイを構築する。
 
 Binary Cacheを導入する。
 
+状態: **基盤設定を実装、実機適用は未実施（2026-10-05）**。
+Nix標準のファイルキャッシュをnginxと既存Cloudflare Tunnelで配信する。
+署名付きclosure公開コマンド、公開鍵を投入して有効化するlaptop設定、基盤のVM試験を追加。
+署名鍵生成・DNS追加・実機取得確認、CI・定期更新・retention・正本移行は未実施。
+
 作業:
 
 - Cache server導入
