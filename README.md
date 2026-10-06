@@ -17,7 +17,8 @@ Phase 6は2026-09-29に完了。DNS切替後の公開アクセス、実機での
 release維持、復旧後の正常デプロイと公開`/healthz`を確認済み。
 Phase 7はBinary Cache基盤の公開・署名付きprobe取得、laptop設定適用、Forgejoへの正本移行を確認済み。
 専用Nix Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
-12時間ごとの定期更新を実装。定期更新の実機実行とretentionは未実施。
+2026-10-06 09:00 JSTの初回定期実行は成功。fish補完を含むキャッシュ利用の恒久設定・適用も確認済み。
+retention設定と成功statusの公開ログリンク修正が残る。
 
 ```text
 flake.nix

@@ -4,7 +4,8 @@
 基盤の実機適用・署名鍵生成・DNS設定・署名付きprobe取得を確認済み。laptopへの設定適用も利用者が確認済み。
 `nixos-config`のoriginはForgejoへ切替済みで、移行時のmain（`4f29345`）の一致を確認した。
 専用Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
-12時間ごとの定期更新を実装済みで、実機での初回実行は未実施。retentionは後続作業。
+12時間ごとの定期更新は2026-10-06 09:00 JSTの初回実行に成功。
+fish補完を含むキャッシュ利用の恒久設定・適用も確認済み。retentionと成功statusのログリンク修正は後続作業。
 既存のRemote Builder運用は[こちら](nix-remote-builder.md)を参照。
 
 ## 目的
@@ -71,6 +72,7 @@ fish補完などの`allowSubstitutes = false`な生成物もキャッシュ取�
 この設定を初めて適用する際は`nh os switch -- --always-allow-substitutes`を使う。
 2026-10-06に、同じ構成のdry-runがビルド85件から0件・取得39件に変わることを確認し、
 利用者から実機での高速化も確認された。
+恒久設定はlaptopリポジトリの`d3cf92a`にコミットし、実機のNix設定でも有効化を確認済み。
 
 キャッシュにない成果物は既存のRemote Builder運用でビルドする。
 Ryzen自体が利用できない場合は、既存の手動ローカルビルド手順を使う。
@@ -87,7 +89,8 @@ Ryzen自体が利用できない場合は、既存の手動ローカルビルド
 - 更新失敗時に更新コミットが公開されないこと、キャッシュ停止時のビルド手順を確認する。
 
 キャッシュはNix標準のファイルキャッシュをnginxで配信する。
-実行時刻、ブランチ構成、ジョブの認証・権限、retentionの具体的な期間は後続実装時に決める。
+実行時刻、ブランチ構成、ジョブの認証・権限は後述の構成で導入済み。
+retentionの具体的な期間と削除処理は後続実装で決める。
 
 ## キャッシュ基盤の適用手順
 
@@ -207,7 +210,8 @@ HTTP障害時の待ち時間はNixの通信タイムアウト・再試行に依�
 `nix flake check`には隔離VMでの基盤試験を追加している。
 署名付きclosureの取得、別鍵での拒否、HTTP書き込み拒否、Store GC後の取得、
 キャッシュ停止時のローカルビルドを確認する。
-実機のTunnel、DNS、laptopのNixOS全closureとfish completionsの確認は別途必要。
+実機のTunnel・DNS・laptopでのキャッシュ利用も確認済み。
+2026-10-06にfish補完を含む取得と高速化を利用者が確認した。
 
 2026-10-05に`nix flake check`（既存Forgejo・Web試験を含む）、Ryzen構成全体のビルド、
 両リポジトリの静的チェックを確認済み。laptopは`nix flake check --no-build`で構成を評価し、
@@ -381,7 +385,9 @@ scheduleと手動実行は抑止しないため、lock更新のpushから更新�
 `SKIP_WORKFLOW_STRINGS`を独自設定する場合は`[skip ci]`を残す。
 
 定期実行のActions画面は開始時点のSHAに関連付く。
-laptopで更新を取り込む前には、新しいコミットの`Nix cache / lock update`成功statusとリンク先の実行結果を確認する。
+laptopで更新を取り込む前には、新しいコミットの`Nix cache / lock update`成功statusと実行結果を確認する。
+現在のstatusのログリンクは内部URLとインスタンス全体の実行IDになっているため、修正までは
+リポジトリのActions画面から対象実行を開く。公開URLとリポジトリ内の実行番号への修正が必要。
 
 ### 適用と初回確認
 
@@ -415,8 +421,13 @@ git push origin main
 回帰試験は隔離したbare Gitリポジトリを使い、更新・ビルド・公開・検証失敗時のpush抑止、
 差分なし、実際のnon-fast-forward競合と再ビルド、3回競合後の終了、push拒否、status失敗、
 既存の未コミット変更の保持を確認する。Nixビルド・公開・APIだけはダミーコマンドで置き換える。
-本番のトークン権限、skip-ci、schedule、最新inputsのlaptopビルドは実機の初回実行で確認する。
+本番のトークン権限、skip-ci、schedule、最新inputsのlaptopビルドは実機の初回実行でも確認済み。
 
 2026-10-06の実装時に、回帰試験8件、VMテストを含む`nix flake check`、
 Ryzen構成全体のビルド、`statix`・`deadnix`・workflowの`actionlint`が成功。
-本番への適用と定期更新workflowの初回実行は未実施。
+本番への適用と定期更新workflowの初回実行も完了。
+2026-10-06の[定期実行 #3](https://git.floating-gate.com/jinji/nixos-config/actions/runs/3)は
+09:00:49に開始し、09:12:54 JSTに成功した。
+lock更新・ビルド・キャッシュ公開・署名検証後に`b621cab`をmainへpushし、
+`Nix cache / lock update`の成功statusを09:12:53 JSTに登録した。
+通常pushの重複CIは起動していない。retention、statusの公開ログリンク修正、本番での意図的失敗試験は未実施。

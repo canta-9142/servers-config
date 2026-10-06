@@ -776,13 +776,15 @@ Binary CacheはRyzen上で提供する。
 
 運用方針の詳細は[Binary Cache運用計画](docs/nix-binary-cache.md)を参照。
 `~/nixos-config`の正本はRyzenのForgejoへ移行済み。
-Ryzenで12時間ごとにflake inputsを更新してlaptop構成全体をビルドする計画とする。
+Ryzenで毎日09:00・21:00 JSTにflake inputsを更新してlaptop構成全体をビルドする。
 システムのclosureをキャッシュへ公開した後、成功した更新コミットだけをpushする。
 laptopはCI成功を確認してpullし、原則`--update`なしで`nh os switch`する。
 設定変更のmainへのpushでもCIでビルド・公開する。
-キャッシュ基盤は実機確認済み、push時CIは設定実装済みで実機実行待ち。
-push時CIの初回成功とlaptopでのキャッシュ利用を確認済み。
-12時間ごとの定期更新は実装済みで、実機での初回実行待ち。
+キャッシュ基盤、push時CI、laptopでのキャッシュ利用を実機確認済み。
+2026-10-06の初回定期実行は09:00:49に開始し、09:12:54に成功。
+更新コミット`b621cab`のpushと成功status登録を確認した。
+laptopの`always-allow-substitutes = true`を恒久設定・適用済みで、fish補完を含む取得と高速化を確認した。
+retention設定と成功statusの公開ログリンク修正は後続作業。
 
 目的:
 
@@ -1197,32 +1199,40 @@ RyzenへのWeb自動デプロイを構築する。
 
 Binary Cacheを導入する。
 
-状態: **push時CI・キャッシュ利用を実機確認、定期更新を実装（2026-10-06）**。
+状態: **定期更新・fish補完を含むキャッシュ利用を実機確認、retentionは未実装（2026-10-06）**。
 Nix標準のファイルキャッシュをnginxと既存Cloudflare Tunnelで配信する。
 署名付きclosure公開コマンド、公開鍵を投入して有効化するlaptop設定、基盤のVM試験を追加。
 署名鍵生成・DNS追加・署名付きprobe取得、laptop設定適用、Forgejoへの正本移行を確認済み。
 専用Runnerとmainへのpush時のlaptop構成ビルド・署名付きclosure公開を実装。
 Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
 09:00・21:00 JSTの定期更新、公開・検証後だけのpush、競合時の再ビルドを実装。
-定期更新の実機実行とretentionは未実施。
+初回定期実行は2026-10-06 09:00:49〜09:12:54 JSTに成功（約12分）。
+[実行 #3](https://git.floating-gate.com/jinji/nixos-config/actions/runs/3)で
+lock更新・ビルド・キャッシュ公開・署名検証・`b621cab`のpush・成功status登録まで確認済み。
+laptopの`always-allow-substitutes = true`を恒久設定・適用済み。
+同じ構成のdry-runがビルド85件から0件・キャッシュ取得39件に変わり、利用者も実機の高速化を確認した。
+キャッシュ停止時のbuildはVM試験、更新失敗時のpush抑止・Git競合は回帰試験で確認済み。
+本番での意図的な失敗試験は未実施。
+retentionは未実装。成功statusのログリンクは内部URL・インスタンス全体の実行IDになっており、修正が必要。
 
 作業:
 
-- Cache server導入
-- signing key
-- クライアント設定
-- CI連携
-- retention設定
-- `nixos-config`の正本をForgejoへ移行
-- 12時間ごとのlock更新・laptop構成の事前ビルド・キャッシュ公開後のpush
-- 設定変更push時のlaptop構成ビルド・公開
+- [x] Cache server導入
+- [x] signing key
+- [x] クライアント設定（fish補完もキャッシュ取得対象にする恒久設定を含む）
+- [x] CI連携
+- [ ] retention設定
+- [x] `nixos-config`の正本をForgejoへ移行
+- [x] 12時間ごとのlock更新・laptop構成の事前ビルド・キャッシュ公開後のpush
+- [x] 設定変更push時のlaptop構成ビルド・公開
+- [ ] 成功statusのログリンクを公開URLとリポジトリ内の実行番号へ修正
 
 完了条件:
 
-- CI成果物を他端末が取得可能
-- 同じコミットのlaptop構成をfish completionsも含めて取得可能
-- 定期更新失敗時に更新コミットを公開せず、前回成功分を維持
-- Cache停止時も通常build可能
+- [x] CI成果物を他端末が取得可能
+- [x] 同じコミットのlaptop構成をfish completionsも含めて取得可能
+- [x] 定期更新失敗時に更新コミットを公開せず、前回成功分を維持（回帰試験）
+- [x] Cache停止時も通常build可能（VM試験）
 
 ---
 
