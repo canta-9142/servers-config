@@ -7,6 +7,7 @@
     ./runner.nix
     ./web.nix
     ./nix-cache.nix
+    ./nix-ci.nix
     ./kernel-build.nix
     ../../modules/system/common.nix
     ../../modules/system/ssh.nix

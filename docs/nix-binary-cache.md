@@ -1,8 +1,10 @@
 # Nix Binary Cache運用計画（Phase 7）
 
-2026-10-05時点。署名付きファイルキャッシュのサーバー設定・公開コマンド・laptop設定を実装済み。
-実機への適用、署名鍵の生成、DNS設定、端末間の取得確認は未実施。
-定期更新ジョブ、retention、`nixos-config`の正本移行は後続作業。
+2026-10-06時点。署名付きファイルキャッシュのサーバー設定・公開コマンド・laptop設定を実装済み。
+基盤の実機適用・署名鍵生成・DNS設定・署名付きprobe取得を確認済み。laptopへの設定適用も利用者が確認済み。
+`nixos-config`のoriginはForgejoへ切替済みで、移行時のmain（`4f29345`）の一致を確認した。
+専用Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
+12時間ごとの定期更新を実装済みで、実機での初回実行は未実施。retentionは後続作業。
 既存のRemote Builder運用は[こちら](nix-remote-builder.md)を参照。
 
 ## 目的
@@ -44,10 +46,10 @@ Ryzenで12時間に一度、次の順序で更新を準備する。
 最新の設定を取り込んで再ビルドする。設定変更のpushと定期更新の競合で、
 未検証の組み合わせを公開しない。
 
-設定変更のpushでもlaptop構成をビルド・公開する。
+設定変更のmainへのpushでもlaptop構成をビルド・公開する。
 手動変更はpush時点では未ビルドなので、laptopで取り込む前に対象コミットの
-CI成功を確認する。定期ジョブ自身のpushによるCIの重複実行・更新ループを避ける
-具体的なトリガー設定は実装時に決める。
+CI成功を確認する。定期ジョブ自身のpushは`[skip ci]`で通常CIを抑止する。
+更新コミットには`Nix cache / lock update`という成功statusと、検証した定期実行へのリンクを付ける。
 
 ## laptopでの操作
 
@@ -63,6 +65,12 @@ nh os switch
 通常は`--update`を付けない。手元の未コミット変更やCIより先のlock更新があると、
 キャッシュと一致しない成果物のビルドが必要になる。
 CIは自動でlaptopへ適用せず、適用のタイミングは利用者が決める。
+
+`hosts/laptop/nix-cache.nix`で`always-allow-substitutes = true`を設定する。
+fish補完などの`allowSubstitutes = false`な生成物もキャッシュ取得の対象になる。
+この設定を初めて適用する際は`nh os switch -- --always-allow-substitutes`を使う。
+2026-10-06に、同じ構成のdry-runがビルド85件から0件・取得39件に変わることを確認し、
+利用者から実機での高速化も確認された。
 
 キャッシュにない成果物は既存のRemote Builder運用でビルドする。
 Ryzen自体が利用できない場合は、既存の手動ローカルビルド手順を使う。
@@ -204,3 +212,211 @@ HTTP障害時の待ち時間はNixの通信タイムアウト・再試行に依�
 2026-10-05に`nix flake check`（既存Forgejo・Web試験を含む）、Ryzen構成全体のビルド、
 両リポジトリの静的チェックを確認済み。laptopは`nix flake check --no-build`で構成を評価し、
 公開鍵が空の場合の無効化と、検証用公開鍵による設定有効化・既存取得先の維持を確認済み。
+
+## 設定push時のCI
+
+### 構成と権限
+
+`hosts/ryzen/nix-ci.nix`に、`nixos-config`リポジトリ専用のRunnerを追加した。
+
+- Runner名・ラベル: `ryzen-nix-build`（`host`実行）
+- サービス: `gitea-runner-nix.service`、実行ユーザー: `nix-ci`
+- 登録用token file: `/etc/forgejo-runner/nix.env`
+- 登録状態・job workspace: `/var/lib/gitea-runner-nix`（0700）
+- 同時実行1件、Runner側8時間・workflow側6時間の制限
+- Bash、Git、Node.js 22、NixをホストPATHへ追加
+- Nix daemonを利用する。`nix-ci`を`trusted-users`や`wheel`には追加しない。
+- sudoは`/run/current-system/sw/bin/nix-cache-publish`だけをパスワードなしで許可する。
+
+Web Runnerとはユーザー・登録状態・ラベルを分ける。ジョブはコンテナではなくホストで実行するため、
+このRunnerは信頼する`nixos-config`リポジトリだけに登録し、workflowの編集権限を管理する。
+workflow作者は`nix-ci`としてホスト上でコードを実行でき、有効なStore pathを署名・公開できる。
+署名鍵そのものやrootの任意コマンドへのアクセスは許可しない。
+[Forgejoのhost実行とラベルの説明](https://forgejo.org/docs/latest/admin/actions/configuration/#host)も参照。
+
+公開コマンドはstore hashを含む絶対pathだけを許可し、`nix-store --check-validity`で
+既存成果物であることを確認する。rootとしてflakeを評価・ビルドしない。
+Nixビルドはdaemon側で実行されるため、RunnerサービスのCPU・メモリ制限だけでは
+ビルド資源を制限できない。workflowはビルドの`--max-jobs 1 --cores 8`を指定する。
+他のRemote Builder利用者との資源競合は残る。
+
+### workflowの動作
+
+laptopリポジトリの`.forgejo/workflows/nix-cache.yml`を使う。
+通常ビルドは`main`へのpushと、`main`を対象にした手動実行（`update_lock = false`）を処理する。
+PRや他ブランチでは実行しない。定期更新のscheduleと`update_lock = true`の手動実行は別jobで処理する。
+
+1. 既存Web CIと同じrevisionに固定したcheckout actionで対象コミットを取得する。認証情報はGit設定に残さない。
+2. checkout済みHEADがイベントのSHAと一致することを確認する。
+3. `nix build .#nixosConfigurations.nixos.config.system.build.toplevel`でlaptop構成全体をビルドする。
+   lockは更新せず、flake側のキャッシュ設定は`--accept-flake-config`で受け入れる。
+   Nix daemonの信頼設定を変更する権限はないため、未許可の追加キャッシュ設定は無視されることがある。
+4. `result`の絶対pathをsudo経由の公開コマンドへ渡し、closure全体を署名・公開する。
+5. 公開HTTPSのキャッシュを`nix store verify --no-contents --recursive --sigs-needed 1`で確認する。
+   checkoutした公開鍵を使い、closure全体のメタデータと署名を検証する。
+
+全stepが成功したときだけCI成功となる。ビルド失敗時は公開stepへ進まず、既存キャッシュを保持する。
+公開や公開URLの確認に失敗した場合もCIは失敗とする。コピー済み成果物は消さず、再実行で再利用する。
+同時実行は直列化し、進行中jobを新しいpushで中止しない。laptopへの適用・lock更新・Gitへのpushは行わない。
+`result`は次回checkoutまでビルド成果物のGC rootになる。
+
+`--no-contents`の確認はNARの全量ダウンロードを省略する。
+ファイル本体の取得試験は後述のlaptop受入確認で別途実施する。
+
+### Runner登録と適用
+
+1. Forgejoの`jinji/nixos-config`でSettings → ActionsからActionsを有効にする。
+2. 同リポジトリのSettings → Actions → Runnersで登録トークンを取得する。
+   インスタンス全体や組織単位のRunnerにはしない。
+3. Ryzenでtoken fileを初回作成する。既存ファイルがある場合は上書きしない。
+
+```sh
+sudo install -d -m 700 /etc/forgejo-runner
+sudo test ! -e /etc/forgejo-runner/nix.env && sudo install -m 600 /dev/null /etc/forgejo-runner/nix.env
+sudoedit /etc/forgejo-runner/nix.env
+```
+
+エディタで`TOKEN=<登録トークン>`の1行を保存する。値をGitやチャット、コマンド履歴に記載しない。
+
+4. Ryzenで更新した`servers-config`を取得し、ビルド・適用する。
+
+```sh
+cd ~/servers-config
+nix build .#nixosConfigurations.ryzen.config.system.build.toplevel
+nh os switch
+systemctl status gitea-runner-nix
+```
+
+token file、Forgejoの移行マーカー、署名鍵が揃うまでRunnerは起動しない。
+設定適用後にtoken fileを作成した場合は、`sudo systemctl start gitea-runner-nix`を実行する。
+ForgejoでRunnerがonlineで、ラベルが`ryzen-nix-build`であることを確認する。
+
+5. laptopのworkflowとactionlint設定をコミットし、Forgejoの`main`へpushする。
+   pushはCIでlaptop構成をビルド・公開するが、laptopを自動で再構成しない。
+
+```sh
+cd ~/nixos-config
+nix shell nixpkgs#actionlint --command actionlint \
+  -config-file .forgejo/actionlint.yaml .forgejo/workflows/nix-cache.yml
+git add .forgejo/workflows/nix-cache.yml .forgejo/actionlint.yaml
+git commit -m "ci: build and publish laptop NixOS closure"
+git push origin main
+```
+
+### 初回受入確認
+
+- 対象コミットのCIが成功し、ログに公開したsystem pathが表示されることを確認する。
+- 同じコミットを使うlaptopで、そのsystem pathを先の`PROBE_ROOT`方式で空のStoreへ取得する。
+  closureにはfish completions等の構成生成物も含まれる。空き容量と通信量を確認して実行する。
+- 取得後に`nh os switch`を実行する。laptop固有の生成物がキャッシュから取得されることを確認する。
+- 意図的なビルド失敗を確認する場合は、信頼するmainへのテストコミットで実施し、
+  公開stepがスキップされることと既存キャッシュが取得できることを確認してからrevertする。
+- Runnerの実機登録・初回CI・laptopでのキャッシュ利用は利用者が確認済み。意図的な失敗試験は未確認。
+
+基盤VM試験は専用ユーザーのdaemon経由ビルド、制限付きsudoでの公開、
+秘密鍵・root任意コマンド・不正な公開引数へのアクセス拒否と、公開closureの署名検証も確認する。
+実際のRunner登録・checkout action・laptop構成全体のCIビルドは、このVM試験には含めない。
+
+2026-10-05に拡張したVM試験を含む`nix flake check`、`statix`、`deadnix`、
+Ryzen構成全体のビルドと、独自Runnerラベルを設定した`actionlint`が成功。
+
+## 定期更新の導入と確認
+
+### スケジュールと実行方式
+
+同じ`.forgejo/workflows/nix-cache.yml`に`update-lock` jobを追加した。
+`0 */12 * * *`（UTC）で毎日09:00・21:00 JSTに起動する。
+Forgejoがdefault branchのworkflowからscheduleを登録し、既存のRyzen Runnerで実行する。
+Runner待ちや長いビルドがある場合、実際の開始時刻は遅れる。
+[Forgejoのschedule仕様](https://forgejo.org/docs/latest/user/actions/reference/#onschedule)を参照。
+
+通常pushのビルドと同じconcurrency groupを使い、Runnerのcapacityも1のままとする。
+ジョブは6時間でタイムアウトする。通常pushや通常の手動ビルドではlockを更新しない。
+定期更新はschedule、またはmainを対象とした手動実行で`update_lock = true`を選んだ場合だけ動く。
+
+### 更新・公開・push
+
+Ryzenに`nix-cache-update`をインストールする。
+処理本体は`servers-config/scripts/update-nix-cache.sh`で、CIの使い捨てcheckout内から実行する。
+このコマンドは利用者の通常cloneでは実行しない。最初にtrackedな未コミット変更がないことを確認する。
+
+1. 最新のorigin/mainをfetchし、対象SHAへdetached checkoutする。
+2. flake inputsを更新し、差分がある場合は`flake.lock`だけをローカルでコミットする。
+   作者は`nix-cache-updater`、メッセージは`chore: update flake.lock [skip ci]`。
+3. そのコミットのlaptop構成全体をビルドし、既存のsudo公開コマンドでclosureを署名・公開する。
+4. 公開HTTPSのclosureメタデータと署名を再帰的に検証する。
+5. 更新コミットがある場合だけmainへ通常pushする。force pushや単なるrebaseでは競合を回避しない。
+6. 実際に検証したコミットへ`Nix cache / lock update`の成功statusをAPIで登録し、定期実行のURLを付ける。
+
+lockに差分がない場合も、最新構成のビルド・公開・検証は行い、新しいコミットは作らない。
+これにより手動で初回実行する際、inputsに更新がなくても処理全体を確認できる。
+
+ビルド・公開・署名検証のいずれかが失敗した場合、更新コミットはpushしない。
+失敗時に新しくコピーできたキャッシュ成果物は残るが、未検証の更新コミットは公開しない。
+通常pushが競合した場合は最新mainからlock更新・コミット・ビルド・公開・検証をすべてやり直す。
+3回とも競合した場合は失敗として終了し、次回実行へ持ち越す。
+mainが進んでいないpush失敗（認証・通信等）は、その場で失敗とする。
+通信切断後に更新コミットがmainへ到達していたと確認できた場合は、status登録へ進む。
+
+status APIだけが失敗した場合は、ビルド・公開・検証済みのコミットがpush済みである可能性がある。
+未検証の更新ではないため巻き戻さず、ジョブを失敗とし、ログの対象SHAと公開結果を確認する。
+次回、lockに差分がない場合も再検証・status登録を実行する。
+
+### 認証と重複実行の抑止
+
+新しいSSH鍵や長期PATは不要。checkout actionがジョブ限定の自動トークンをGit設定に保存し、
+push時に使用する。status APIも同じトークンを使う。checkoutのpost-job処理で認証設定を削除し、
+トークン自体もジョブ終了時に失効する。
+[Forgejoの自動トークン](https://forgejo.org/docs/latest/user/actions/security/#automatic-token)を参照。
+
+更新jobは`contents: write`と`statuses: write`を宣言する。
+Forgejoでは実際の権限は自動トークンとリポジトリ設定にも依存するため、
+初回実行でmainへのpushとstatus APIを確認する。mainの保護設定がある場合は、この書き込みを許可する必要がある。
+トークンはjobの環境変数で渡し、scriptはxtraceを無効にして値をログへ出さない。
+
+`[skip ci]`はForgejo 16.0.5の標準設定でpush時のworkflow実行を抑止する。
+scheduleと手動実行は抑止しないため、lock更新のpushから更新ループを起こさない。
+[標準のskip文字列](https://codeberg.org/forgejo/forgejo/src/tag/v16.0.5/modules/setting/actions.go)と
+[イベント別の抑止処理](https://codeberg.org/forgejo/forgejo/src/tag/v16.0.5/services/actions/notifier_helper.go)を参照。
+`SKIP_WORKFLOW_STRINGS`を独自設定する場合は`[skip ci]`を残す。
+
+定期実行のActions画面は開始時点のSHAに関連付く。
+laptopで更新を取り込む前には、新しいコミットの`Nix cache / lock update`成功statusとリンク先の実行結果を確認する。
+
+### 適用と初回確認
+
+1. Ryzenへ更新した`servers-config`を取り込み、ビルドして適用する。
+
+```sh
+cd ~/servers-config
+nix build .#nixosConfigurations.ryzen.config.system.build.toplevel
+nh os switch
+test -x /run/current-system/sw/bin/nix-cache-update
+```
+
+2. laptopの更新workflowをコミットしてForgejoのmainへpushする。
+   先にサーバー側コマンドを適用してからworkflowを公開する。
+
+```sh
+cd ~/nixos-config
+nix shell nixpkgs#actionlint --command actionlint \
+  -config-file .forgejo/actionlint.yaml .forgejo/workflows/nix-cache.yml
+git add .forgejo/workflows/nix-cache.yml
+git commit -m "ci: update and prebuild laptop inputs every twelve hours"
+git push origin main
+```
+
+3. Actionsからmainを対象に手動実行し、`update_lock`をtrueにする。
+4. lock更新・ビルド・公開・署名検証・push・status登録までの成功を確認する。
+   差分がある場合、mainにはflake.lockだけを変更するコミットが増え、通常ビルドは重複起動しない。
+5. 新コミットの成功statusを確認して、laptopで`git pull --ff-only`、`nh os switch`を実行する。
+   次の09:00または21:00 JSTにschedule実行が起動することも確認する。
+
+回帰試験は隔離したbare Gitリポジトリを使い、更新・ビルド・公開・検証失敗時のpush抑止、
+差分なし、実際のnon-fast-forward競合と再ビルド、3回競合後の終了、push拒否、status失敗、
+既存の未コミット変更の保持を確認する。Nixビルド・公開・APIだけはダミーコマンドで置き換える。
+本番のトークン権限、skip-ci、schedule、最新inputsのlaptopビルドは実機の初回実行で確認する。
+
+2026-10-06の実装時に、回帰試験8件、VMテストを含む`nix flake check`、
+Ryzen構成全体のビルド、`statix`・`deadnix`・workflowの`actionlint`が成功。
+本番への適用と定期更新workflowの初回実行は未実施。

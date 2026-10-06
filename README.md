@@ -15,8 +15,9 @@ ROCK側の設定整理は保留。
 Phase 5はRyzen RunnerでWebビルドとCI失敗時の本番維持を確認済み。
 Phase 6は2026-09-29に完了。DNS切替後の公開アクセス、実機でのビルド失敗時の
 release維持、復旧後の正常デプロイと公開`/healthz`を確認済み。
-Phase 7は署名付きBinary Cache基盤の設定・公開コマンド・VM試験を実装。
-実機適用・署名鍵生成・DNS設定・laptopからの取得確認は未実施。
+Phase 7はBinary Cache基盤の公開・署名付きprobe取得、laptop設定適用、Forgejoへの正本移行を確認済み。
+専用Nix Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
+12時間ごとの定期更新を実装。定期更新の実機実行とretentionは未実施。
 
 ```text
 flake.nix
@@ -25,6 +26,7 @@ modules/system/       SSH・Mesh・保守・管理ユーザー
 tests/forgejo.nix       Forgejo移行・起動抑止・Mesh SSH制限の試験
 tests/web.nix           nginx・healthz・公開release切替の試験
 tests/nix-cache.nix     署名付きcache・closure取得・障害時buildの試験
+tests/nix-cache-update.py 定期更新のpush抑止・Git競合の回帰試験
 ```
 
 `nixpkgs`は既存の`~/nixos-config`と同じrevisionから開始し、`flake.lock`で固定。

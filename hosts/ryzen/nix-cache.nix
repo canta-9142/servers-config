@@ -18,11 +18,13 @@ let
         exit 1
       fi
       for storePath in "$@"; do
-        if [[ $storePath != /nix/store/* ]]; then
+        if [[ ! $storePath =~ ^/nix/store/[0123456789abcdfghijklmnpqrsvwxyz]{32}-[^/]+$ ]]; then
           echo "Expected an absolute Nix store path." >&2
           exit 1
         fi
       done
+      # Validate without evaluating an installable or a flake as root.
+      nix-store --check-validity "$@"
       if [[ ! -s ${secretKey} ]]; then
         echo "Missing ${secretKey}; follow docs/nix-binary-cache.md." >&2
         exit 1

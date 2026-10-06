@@ -775,11 +775,14 @@ nix build --builders '' --max-jobs 1 <installable>
 Binary CacheはRyzen上で提供する。
 
 運用方針の詳細は[Binary Cache運用計画](docs/nix-binary-cache.md)を参照。
-`~/nixos-config`の正本をRyzenのForgejoへ移し、Ryzenで12時間ごとに
-flake inputsを更新してlaptop構成全体をビルドする。
+`~/nixos-config`の正本はRyzenのForgejoへ移行済み。
+Ryzenで12時間ごとにflake inputsを更新してlaptop構成全体をビルドする計画とする。
 システムのclosureをキャッシュへ公開した後、成功した更新コミットだけをpushする。
 laptopはCI成功を確認してpullし、原則`--update`なしで`nh os switch`する。
-設定変更のpushもCIでビルド・公開する。これらはPhase 7で導入する計画であり、未実施。
+設定変更のmainへのpushでもCIでビルド・公開する。
+キャッシュ基盤は実機確認済み、push時CIは設定実装済みで実機実行待ち。
+push時CIの初回成功とlaptopでのキャッシュ利用を確認済み。
+12時間ごとの定期更新は実装済みで、実機での初回実行待ち。
 
 目的:
 
@@ -1194,10 +1197,14 @@ RyzenへのWeb自動デプロイを構築する。
 
 Binary Cacheを導入する。
 
-状態: **基盤設定を実装、実機適用は未実施（2026-10-05）**。
+状態: **push時CI・キャッシュ利用を実機確認、定期更新を実装（2026-10-06）**。
 Nix標準のファイルキャッシュをnginxと既存Cloudflare Tunnelで配信する。
 署名付きclosure公開コマンド、公開鍵を投入して有効化するlaptop設定、基盤のVM試験を追加。
-署名鍵生成・DNS追加・実機取得確認、CI・定期更新・retention・正本移行は未実施。
+署名鍵生成・DNS追加・署名付きprobe取得、laptop設定適用、Forgejoへの正本移行を確認済み。
+専用Runnerとmainへのpush時のlaptop構成ビルド・署名付きclosure公開を実装。
+Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
+09:00・21:00 JSTの定期更新、公開・検証後だけのpush、競合時の再ビルドを実装。
+定期更新の実機実行とretentionは未実施。
 
 作業:
 

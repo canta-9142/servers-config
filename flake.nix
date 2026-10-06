@@ -27,6 +27,21 @@
         forgejo = import ./tests/forgejo.nix { inherit pkgs; };
         web = import ./tests/web.nix { inherit pkgs; };
         nix-cache = import ./tests/nix-cache.nix { inherit pkgs; };
+        nix-cache-update =
+          pkgs.runCommand "nix-cache-update-check"
+            {
+              nativeBuildInputs = with pkgs; [
+                bash
+                coreutils
+                gitMinimal
+                jq
+                python3
+              ];
+            }
+            ''
+              python ${./tests/nix-cache-update.py} ${./scripts/update-nix-cache.sh}
+              touch "$out"
+            '';
       };
     };
 }
