@@ -35,7 +35,12 @@ pkgs.testers.runNixOSTest {
         machine.fail("sudo -u nix-ci sudo -n true")
     machine.succeed("install -d -m 700 -o nix-ci -g nix-ci /var/lib/gitea-runner-nix/nix")
     with subtest("the untrusted CI account can build through the Nix daemon"):
-        machine.succeed("sudo -u nix-ci env NIX_REMOTE=daemon nix-build --no-out-link --expr 'derivation { name = \"ci-build-probe\"; system = builtins.currentSystem; shell = builtins.storePath \"${pkgs.bash}\"; builder = \"${pkgs.bash}/bin/bash\"; args = [ \"-c\" \"echo ci-build > $out\" ]; }'")
+        ci_build = "sudo -u nix-ci env NIX_REMOTE=daemon nix-build --no-out-link --expr 'derivation { name = \"ci-build-probe\"; system = builtins.currentSystem; shell = builtins.storePath \"${pkgs.bash}\"; builder = \"${pkgs.bash}/bin/bash\"; args = [ \"-c\" \"echo ci-build > $out\" ]; }'"
+        machine.succeed(ci_build)
+    with subtest("CI can enable third-party caches without elevated trust"):
+        # Reuse the built probe so this tests daemon permissions without network access.
+        output = machine.succeed(ci_build + " --option extra-substituters 'https://noctalia.cachix.org https://look.cachix.org' 2>&1")
+        assert "ignoring untrusted substituter" not in output, output
     with subtest("publishing requires arguments and a signing key"):
         machine.fail("nix-cache-publish")
         machine.fail(f"nix-cache-publish {artifact}")

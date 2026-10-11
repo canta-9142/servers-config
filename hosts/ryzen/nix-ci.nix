@@ -1,4 +1,9 @@
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   update = pkgs.writeShellApplication {
     name = "nix-cache-update";
@@ -7,12 +12,25 @@ let
       curl
       gitMinimal
       jq
-      nix
+      config.nix.package
     ];
     text = builtins.readFile ../../scripts/update-nix-cache.sh;
   };
 in
 {
+  # Nix 2.35 fixes scheduler memory use and slow build startup on large closures.
+  nix.package = pkgs.nixVersions.nix_2_35;
+  nix.settings = {
+    extra-substituters = [
+      "https://noctalia.cachix.org"
+      "https://look.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
+      "look.cachix.org-1:8elPCeSVBzlDZXqIRKBK9GyLIK/Hoe1xiWZF0ir7uX4="
+    ];
+  };
+
   environment.systemPackages = [ update ];
   users.groups.nix-ci = { };
   users.users.nix-ci = {
@@ -34,7 +52,7 @@ in
         coreutils
         gitMinimal
         nodejs_22
-        nix
+        config.nix.package
       ];
       settings = {
         runner = {

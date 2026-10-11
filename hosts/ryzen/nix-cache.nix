@@ -1,11 +1,11 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 let
   cacheRoot = "/srv/nix-cache";
   secretKey = "/var/lib/nix-cache/signing-key";
   publish = pkgs.writeShellApplication {
     name = "nix-cache-publish";
     runtimeInputs = [
-      pkgs.nix
+      config.nix.package
       pkgs.util-linux
     ];
     text = ''
