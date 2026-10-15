@@ -2,6 +2,21 @@
 {
   imports = [ ./fish.nix ];
 
+  # Remove once nixpkgs includes 8d8ca25 (mimalloc is only supported by Lix >= 2.96).
+  nixpkgs.overlays = [
+    (_final: prev: {
+      lixPackageSets = prev.lixPackageSets // {
+        stable = prev.lixPackageSets.stable.overrideScope (
+          _lixFinal: lixPrev: {
+            lix = lixPrev.lix.overrideAttrs (old: {
+              mesonFlags = builtins.filter (flag: !(prev.lib.hasPrefix "-Dmimalloc=" flag)) old.mesonFlags;
+            });
+          }
+        );
+      };
+    })
+  ];
+
   nix.settings.experimental-features = [
     "nix-command"
     "flakes"
