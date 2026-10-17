@@ -4,7 +4,7 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
   outputs =
-    { nixpkgs, ... }:
+    { self, nixpkgs, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
@@ -13,6 +13,16 @@
       nixosConfigurations.ryzen = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [ ./hosts/ryzen ];
+      };
+
+      nixosConfigurations.rock3b = nixpkgs.lib.nixosSystem {
+        system = "aarch64-linux";
+        modules = [ ./hosts/rock3b ];
+      };
+
+      packages.${system}.rock3b-image = import ./hosts/rock3b/image.nix {
+        inherit pkgs;
+        inherit (self.nixosConfigurations.rock3b) config;
       };
 
       devShells.${system}.default = pkgs.mkShellNoCC {
