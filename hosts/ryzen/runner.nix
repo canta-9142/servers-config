@@ -1,5 +1,7 @@
 { pkgs, ... }:
 {
+  imports = [ ../../modules/system/forgejo-runner-registration.nix ];
+
   virtualisation.podman.enable = true;
 
   # Job networks use an aardvark DNS listener on their Podman bridge.

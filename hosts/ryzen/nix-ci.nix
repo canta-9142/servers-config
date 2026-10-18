@@ -18,6 +18,8 @@ let
   };
 in
 {
+  imports = [ ../../modules/system/forgejo-runner-registration.nix ];
+
   # Nix 2.35 fixes scheduler memory use and slow build startup on large closures.
   nix.package = pkgs.nixVersions.nix_2_35;
   nix.settings = {
@@ -69,6 +71,9 @@ in
     wants = [ "forgejo.service" ];
     environment = {
       HOME = lib.mkForce "/var/lib/gitea-runner-nix/nix";
+      INSTANCE_DIR = lib.mkForce "/var/lib/gitea-runner-nix/nix";
+      TOKEN_HASH_FILE = lib.mkForce "/var/lib/gitea-runner-nix/nix/.token-hash";
+      LABELS_FILE = lib.mkForce "/var/lib/gitea-runner-nix/nix/.labels";
       NIX_REMOTE = "daemon";
     };
     unitConfig.ConditionPathExists = [
