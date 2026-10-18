@@ -18,10 +18,7 @@ let
   };
 in
 {
-  imports = [ ../../modules/system/forgejo-runner-registration.nix ];
-
-  # Nix 2.35 fixes scheduler memory use and slow build startup on large closures.
-  nix.package = pkgs.nixVersions.nix_2_35;
+  nix.package = pkgs.lixPackageSets.stable.lix;
   nix.settings = {
     extra-substituters = [
       "https://noctalia.cachix.org"
