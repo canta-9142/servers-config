@@ -41,6 +41,7 @@ let
     name = "rock3b-fan-controller";
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
+      fan_device="$1"
       thermal_zone=""
       pwm_path=""
 
@@ -52,7 +53,7 @@ let
           fi
         done
 
-        for hwmon in /sys/class/hwmon/hwmon*; do
+        for hwmon in /sys/devices/platform/"$fan_device"/hwmon/hwmon*; do
           if [[ -e "$hwmon/name" ]] && [[ "$(< "$hwmon/name")" == "pwmfan" ]]; then
             pwm_path="$hwmon/pwm1"
             break
@@ -67,7 +68,7 @@ let
       done
 
       if [[ -z "$thermal_zone" || ! -w "$pwm_path" ]]; then
-        echo "CPU thermal zone or PWM fan was not found" >&2
+        echo "CPU thermal zone or PWM fan $fan_device was not found" >&2
         exit 1
       fi
 
@@ -157,7 +158,10 @@ in
 
   boot = {
     kernelPackages = pkgs.linuxPackages_latest;
-    kernelModules = [ "pwm-fan" ];
+    kernelModules = [
+      "pwm-fan"
+      "pwm-gpio"
+    ];
     initrd = {
       availableKernelModules = [ "nvme" ];
       extraFirmwarePaths = [ "edid/monitor-rk3568.bin" ];
@@ -227,6 +231,40 @@ in
         '';
       }
       {
+        name = "rock3b-poe-pwm-fan";
+        dtsText = ''
+          /dts-v1/;
+          /plugin/;
+
+          / {
+            compatible = "radxa,rock-3b";
+
+            fragment@0 {
+              target-path = "/";
+              __overlay__ {
+                radxa_poe_pwm: radxa-poe-pwm {
+                  compatible = "pwm-gpio";
+                  #pwm-cells = <3>;
+                  /* GPIO3_C3, GPIO_ACTIVE_HIGH */
+                  gpios = <&gpio3 19 0>;
+                };
+
+                radxa-poe-fan {
+                  compatible = "pwm-fan";
+                  /* 25 kHz, PWM_POLARITY_INVERTED */
+                  pwms = <&radxa_poe_pwm 0 40000 1>;
+                  cooling-levels = <0 115 179 255>;
+                  #cooling-cells = <2>;
+                  fan-stop-to-start-percent = <70>;
+                  fan-stop-to-start-us = <500000>;
+                  fan-shutdown-percent = <100>;
+                };
+              };
+            };
+          };
+        '';
+      }
+      {
         name = "rock3b-rtl8211f-gmac0";
         dtsText = ''
           /dts-v1/;
@@ -247,39 +285,54 @@ in
     ];
   };
 
-  systemd.services.rock3b-fan-controller = {
-    description = "Control the ROCK 3B fan from CPU temperature";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-modules-load.service" ];
+  systemd.services = {
+    rock3b-fan-controller = {
+      description = "Control the ROCK 3B fan from CPU temperature";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "systemd-modules-load.service" ];
 
-    serviceConfig = {
-      Type = "simple";
-      ExecStart = "${fanController}/bin/rock3b-fan-controller";
-      Restart = "always";
-      RestartSec = 2;
-    };
-  };
-
-  systemd.services.rock3b-ethernet-leds = {
-    description = "Configure ROCK 3B RTL8211F Ethernet LEDs";
-
-    wantedBy = [ "multi-user.target" ];
-    wants = [ "network-online.target" ];
-
-    after = [
-      "network-online.target"
-      "sys-subsystem-net-devices-end0.device"
-      "sys-subsystem-net-devices-end1.device"
-    ];
-
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = "${fanController}/bin/rock3b-fan-controller pwm-fan";
+        Restart = "always";
+        RestartSec = 2;
+      };
     };
 
-    script = ''
-      ${configureEthernetLeds}/bin/rock3b-configure-ethernet-leds end0
-      ${configureEthernetLeds}/bin/rock3b-configure-ethernet-leds end1
-    '';
+    rock3b-poe-fan-controller = {
+      description = "Control the ROCK 3B PoE+ HAT fan from CPU temperature";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "systemd-modules-load.service" ];
+
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = "${fanController}/bin/rock3b-fan-controller radxa-poe-fan";
+        Restart = "always";
+        RestartSec = 2;
+      };
+    };
+
+    rock3b-ethernet-leds = {
+      description = "Configure ROCK 3B RTL8211F Ethernet LEDs";
+
+      wantedBy = [ "multi-user.target" ];
+      wants = [ "network-online.target" ];
+
+      after = [
+        "network-online.target"
+        "sys-subsystem-net-devices-end0.device"
+        "sys-subsystem-net-devices-end1.device"
+      ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+
+      script = ''
+        ${configureEthernetLeds}/bin/rock3b-configure-ethernet-leds end0
+        ${configureEthernetLeds}/bin/rock3b-configure-ethernet-leds end1
+      '';
+    };
   };
 }
