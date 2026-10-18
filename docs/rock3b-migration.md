@@ -87,3 +87,20 @@ nix build --builders '' --max-jobs 2 --cores 2 .#rock3b-image --out-link result-
 新規イメージにユーザーパスワードや秘密鍵は含めない。SSHには共通設定の公開鍵を使う。
 `servers-config`の作業コピーは含めないため、起動後に`/home/jinji/servers-config`へ配置する。
 実NVMeへの書き込みや実機での起動確認はイメージ生成とは別作業。
+
+## ファンの一時手動操作
+
+`fanctl`はROCK 3BのシステムPATHに登録される。
+`board`は基板側ファン、`poe`は25W PoE+ HAT側ファンを指定する。
+
+```sh
+sudo fanctl board 40
+sudo fanctl poe 60
+sudo fanctl board auto
+sudo fanctl poe auto
+```
+
+整数の0〜100でPWM出力率を指定する。0は停止、100は全速。
+数値指定時は対象の温度制御サービスを停止してからPWMを設定し、
+`auto`で同サービスを再開する。もう一方のファンには影響しない。
+設定は保存されず、再起動後は両方とも温度制御に戻る。

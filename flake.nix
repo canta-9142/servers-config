@@ -34,6 +34,18 @@
       };
       formatter.${system} = pkgs.nixfmt-tree;
       checks.${system} = {
+        fanctl =
+          pkgs.runCommand "fanctl-check"
+            {
+              nativeBuildInputs = with pkgs; [
+                bash
+                python3
+              ];
+            }
+            ''
+              python ${./tests/fanctl.py} ${./scripts/fanctl.sh}
+              touch "$out"
+            '';
         forgejo = import ./tests/forgejo.nix { inherit pkgs; };
         web = import ./tests/web.nix { inherit pkgs; };
         runner = import ./tests/runner.nix { inherit pkgs; };

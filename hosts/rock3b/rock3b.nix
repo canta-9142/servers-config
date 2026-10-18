@@ -4,6 +4,11 @@
 }:
 
 let
+  fanctl = pkgs.writeShellApplication {
+    name = "fanctl";
+    runtimeInputs = [ pkgs.systemd ];
+    text = builtins.readFile ../../scripts/fanctl.sh;
+  };
   monitorEdid = pkgs.runCommand "monitor-edid" { } ''
     mkdir -p "$out/lib/firmware/edid"
     cp ${../../assets/edid/monitor-rk3568.bin} "$out/lib/firmware/edid/monitor-rk3568.bin"
@@ -150,6 +155,8 @@ let
   };
 in
 {
+  environment.systemPackages = [ fanctl ];
+
   services.fstrim.enable = true;
 
   hardware.firmware = [
