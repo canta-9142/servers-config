@@ -7,6 +7,7 @@
     ./networking.nix
     ../../modules/system/common.nix
     ../../modules/system/ssh.nix
+    ../../modules/system/cloudflare-mesh.nix
   ];
 
   networking.hostName = "rock3b";
