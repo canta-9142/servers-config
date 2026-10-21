@@ -14,7 +14,6 @@
 
   programs.direnv.enable = true;
 
-  # Preserve the existing ROCK's Nix implementation and nh environment handling.
   nix.package = pkgs.lixPackageSets.stable.lix;
   nixpkgs.overlays = [
     (_final: prev: {
@@ -26,7 +25,6 @@
           wrapProgram $out/bin/nh --set NH_PRESERVE_ENV 0
         '';
       };
-      # Upstream phytool has an unused speed variable rejected by newer GCC.
       phytool = prev.phytool.overrideAttrs {
         env.NIX_CFLAGS_COMPILE = "-Wno-error=unused-but-set-variable";
       };
@@ -45,13 +43,23 @@
       htop
       zellij
       dnsutils
+      
       arduino-cli
+      go_latest
+      gopls
+      gotools
+      golangci-lint
     ];
   };
 
-  users.users = {
-    root.shell = pkgs.fish;
-    jinji.description = "Kanta IMAI";
+  users.users.rock = {
+    isNormalUser = true;
+    description = "ROCK 3B";
+    shell = pkgs.fish;
+    extraGroups = [ "dialout" ];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEPtrVcxLNcVNkdjM80No+IjJ9Viijp8O13mopAwaEX jinji@inspiron-5425"
+    ];
   };
 
   security.sudo.extraRules = [
