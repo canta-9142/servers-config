@@ -36,7 +36,6 @@
   environment = {
     sessionVariables.NH_FLAKE = "/home/jinji/servers-config#rock3b";
     systemPackages = with pkgs; [
-      jujutsu
       wget
       curl
       ripgrep
