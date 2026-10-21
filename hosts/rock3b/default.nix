@@ -45,6 +45,7 @@
       htop
       zellij
       dnsutils
+      arduino-cli
     ];
   };
 
