@@ -18,6 +18,8 @@ let
   };
 in
 {
+  imports = [ ../../modules/system/forgejo-runner-registration.nix ];
+
   nix.package = pkgs.lixPackageSets.stable.lix;
   nix.settings = {
     extra-substituters = [
@@ -38,14 +40,13 @@ in
     home = "/var/lib/gitea-runner-nix/nix";
   };
 
-  services.gitea-actions-runner = {
-    package = lib.mkDefault pkgs.forgejo-runner;
+  services.forgejo-runner = {
     instances.nix = {
       enable = true;
-      name = "ryzen-nix-build";
-      url = "http://127.0.0.1:3000";
-      tokenFile = "/etc/forgejo-runner/nix.env";
-      labels = [ "ryzen-nix-build:host" ];
+      registration = {
+        name = "ryzen-nix-build";
+        tokenFile = "/etc/forgejo-runner/nix.env";
+      };
       hostPackages = with pkgs; [
         bash
         coreutils
@@ -54,7 +55,9 @@ in
         config.nix.package
       ];
       settings = {
+        server.connections.default.url = "http://127.0.0.1:3000";
         runner = {
+          labels = [ "ryzen-nix-build:host" ];
           capacity = 1;
           timeout = "8h";
         };
@@ -63,14 +66,11 @@ in
     };
   };
 
-  systemd.services.gitea-runner-nix = {
+  systemd.services.forgejo-runner-nix = {
     after = [ "forgejo.service" ];
     wants = [ "forgejo.service" ];
     environment = {
       HOME = lib.mkForce "/var/lib/gitea-runner-nix/nix";
-      INSTANCE_DIR = lib.mkForce "/var/lib/gitea-runner-nix/nix";
-      TOKEN_HASH_FILE = lib.mkForce "/var/lib/gitea-runner-nix/nix/.token-hash";
-      LABELS_FILE = lib.mkForce "/var/lib/gitea-runner-nix/nix/.labels";
       NIX_REMOTE = "daemon";
     };
     unitConfig.ConditionPathExists = [
@@ -85,6 +85,7 @@ in
       StateDirectory = lib.mkForce "gitea-runner-nix";
       StateDirectoryMode = "0700";
       WorkingDirectory = lib.mkForce "-/var/lib/gitea-runner-nix/nix";
+      ExecPaths = lib.mkForce [ "/var/lib/gitea-runner-nix" ];
       UMask = "0077";
     };
   };

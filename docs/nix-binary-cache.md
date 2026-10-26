@@ -231,7 +231,7 @@ HTTP障害時の待ち時間はNixの通信タイムアウト・再試行に依�
 `hosts/ryzen/nix-ci.nix`に、`nixos-config`リポジトリ専用のRunnerを追加した。
 
 - Runner名・ラベル: `ryzen-nix-build`（`host`実行）
-- サービス: `gitea-runner-nix.service`、実行ユーザー: `nix-ci`
+- サービス: `forgejo-runner-nix.service`、実行ユーザー: `nix-ci`
 - 登録用token file: `/etc/forgejo-runner/nix.env`
 - 登録状態・job workspace: `/var/lib/gitea-runner-nix`（0700）
 - 同時実行1件、Runner側8時間・workflow側6時間の制限
@@ -295,11 +295,11 @@ sudoedit /etc/forgejo-runner/nix.env
 cd ~/servers-config
 nix build .#nixosConfigurations.ryzen.config.system.build.toplevel
 nh os switch
-systemctl status gitea-runner-nix
+systemctl status forgejo-runner-nix
 ```
 
 token file、Forgejoの移行マーカー、署名鍵が揃うまでRunnerは起動しない。
-設定適用後にtoken fileを作成した場合は、`sudo systemctl start gitea-runner-nix`を実行する。
+設定適用後にtoken fileを作成した場合は、`sudo systemctl start forgejo-runner-nix`を実行する。
 ForgejoでRunnerがonlineで、ラベルが`ryzen-nix-build`であることを確認する。
 
 5. laptopのworkflowとactionlint設定をコミットし、Forgejoの`main`へpushする。

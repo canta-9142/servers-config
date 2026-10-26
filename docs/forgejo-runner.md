@@ -11,7 +11,7 @@ Nix build用workflowは今回スキップし、本番デプロイはPhase 6で�
 ## 構成
 
 - Runner名: `ryzen-web-build`、ラベル: `ryzen-web-build`
-- サービス: `gitea-runner-web.service`
+- サービス: `forgejo-runner-web.service`
 - Forgejo接続: `http://127.0.0.1:3000`
 - jobのcheckout: `https://git.floating-gate.com`
 - Podman上の`node:22-alpine`、同時実行1件、30分制限
@@ -57,9 +57,13 @@ nixos-rebuild switch --flake .#ryzen \
 ```
 
 トークンまたはForgejoの移行完了マーカーがない場合はRunnerの起動をスキップする。
-後から配置した場合は`sudo systemctl start gitea-runner-web`を実行する。
+後から配置した場合は`sudo systemctl start forgejo-runner-web`を実行する。
 登録状態は`/var/lib/gitea-runner/web`に保存される。ROCKの登録状態はコピーしない。
 トークン・ラベルの変更時はNixOSモジュールが再登録する。
+
+`services.forgejo-runner`への移行後も既存の`.runner`を引き継ぐ。
+起動時にUUIDと接続トークンを`/run/forgejo-runner/web/config.json`へ展開するため、
+登録トークンの再取得やファイル形式の変更は不要。接続トークンはNix storeへ保存しない。
 
 ## Web CIの受入確認
 
@@ -75,8 +79,8 @@ nixos-rebuild switch --flake .#ryzen \
 3. 同ブランチのbuild job末尾に一時的な`run: exit 1`のstepを加えてpushし、
    CIが失敗しても公開サイトと本番`current`リンクが変わらないことを確認する。
    確認後は失敗用stepを削除する。
-4. 追加の停止試験として、`sudo systemctl stop gitea-runner-web`中もForgejoと公開サイトが利用可能なことを確認し、
-   `sudo systemctl start gitea-runner-web`で再開する。
+4. 追加の停止試験として、`sudo systemctl stop forgejo-runner-web`中もForgejoと公開サイトが利用可能なことを確認し、
+   `sudo systemctl start forgejo-runner-web`で再開する。
 
 checkoutにはコンテナから新しい公開URLへの到達が必要。
 Cloudflare Accessのログイン画面が返る場合は、CI用の認証経路を整えてから再試行する。

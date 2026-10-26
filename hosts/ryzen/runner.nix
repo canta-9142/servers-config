@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, ... }:
 {
   imports = [ ../../modules/system/forgejo-runner-registration.nix ];
 
@@ -10,18 +10,19 @@
     iifname "podman*" tcp dport 53 accept
   '';
 
-  services.gitea-actions-runner = {
-    package = pkgs.forgejo-runner;
+  services.forgejo-runner = {
     instances.web = {
       enable = true;
-      name = "ryzen-web-build";
-      url = "http://127.0.0.1:3000";
-      tokenFile = "/etc/forgejo-runner/web.env";
+      registration = {
+        name = "ryzen-web-build";
+        tokenFile = "/etc/forgejo-runner/web.env";
+      };
       # Podman 5.8.7 rejects archive paths through Debian's /var/run -> /run.
       # https://github.com/podman-container-tools/podman/issues/29805
-      labels = [ "ryzen-web-build:docker://docker.io/library/node:22-alpine" ];
       settings = {
+        server.connections.default.url = "http://127.0.0.1:3000";
         runner = {
+          labels = [ "ryzen-web-build:docker://docker.io/library/node:22-alpine" ];
           capacity = 1;
           timeout = "30m";
         };
@@ -40,7 +41,19 @@
     };
   };
 
-  systemd.services.gitea-runner-web = {
+  systemd.services.forgejo-runner-web = {
+    environment = {
+      HOME = lib.mkForce "/var/lib/gitea-runner/web";
+      DOCKER_HOST = "unix:///run/podman/podman.sock";
+    };
+    serviceConfig = {
+      User = "gitea-runner";
+      StateDirectory = lib.mkForce [
+        "gitea-runner"
+        "gitea-runner/web"
+      ];
+      WorkingDirectory = lib.mkForce "/var/lib/gitea-runner/web";
+    };
     after = [ "forgejo.service" ];
     wants = [ "forgejo.service" ];
     unitConfig.ConditionPathExists = [

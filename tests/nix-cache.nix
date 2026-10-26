@@ -30,8 +30,8 @@ pkgs.testers.runNixOSTest {
     artifact = "${artifact}"
     dependency = "${dependency}"
     with subtest("the Nix runner waits for registration and uses a separate account"):
-        machine.succeed("test $(systemctl show -p User --value gitea-runner-nix) = nix-ci")
-        machine.fail("systemctl is-active gitea-runner-nix")
+        machine.succeed("test $(systemctl show -p User --value forgejo-runner-nix) = nix-ci")
+        machine.fail("systemctl is-active forgejo-runner-nix")
         machine.fail("sudo -u nix-ci sudo -n true")
     machine.succeed("install -d -m 700 -o nix-ci -g nix-ci /var/lib/gitea-runner-nix/nix")
     with subtest("the untrusted CI account can build through the Nix daemon"):
