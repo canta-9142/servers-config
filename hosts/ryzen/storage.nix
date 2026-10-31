@@ -30,10 +30,7 @@ in
         PROGRAM ${mdadmLog}
       '';
     };
-    initrd.systemd = {
-      enable = true;
-      storePaths = [ mdadmLog ];
-    };
+    initrd.systemd.storePaths = [ mdadmLog ];
 
     loader = {
       efi.canTouchEfiVariables = false;
