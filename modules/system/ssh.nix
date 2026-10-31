@@ -3,7 +3,7 @@ _: {
     enable = true;
     openFirewall = false;
     settings = {
-      AllowUsers = [ "jinji" ];
+      AllowUsers = [ "jinji" "rock" ];
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
       PermitRootLogin = "no";
