@@ -164,7 +164,7 @@ in
   ];
 
   boot = {
-    kernelPackages = pkgs.linuxPackages_latest;
+    kernelPackages = pkgs.linuxPackages_7_2;
     kernelModules = [
       "pwm-fan"
       "pwm-gpio"
