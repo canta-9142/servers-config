@@ -5,6 +5,7 @@ Ryzen主系サーバーと、ROCK 3BのNixOS構成。
 - [要件・ロードマップ](requirements-and-roadmap.md)
 - [ROCK 3B基本構成の移行](docs/rock3b-migration.md)
 - [Ryzen SSD・RAID復旧手順](docs/ryzen-storage-recovery.md)
+- [Immichの導入・Mesh接続・バックアップ手順](docs/immich.md)
 - [Nix Remote Builderの適用・運用手順](docs/nix-remote-builder.md)
 - [Nix Binary Cache・12時間ごとの更新計画](docs/nix-binary-cache.md)
 - [Forgejoの移行・公開手順](docs/forgejo-migration.md)
