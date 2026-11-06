@@ -2,11 +2,13 @@
 let
   cacheRoot = "/srv/nix-cache";
   secretKey = "/var/lib/nix-cache/signing-key";
+  retentionScript = ../../scripts/nix-cache-gc.py;
   publish = pkgs.writeShellApplication {
     name = "nix-cache-publish";
     runtimeInputs = [
       config.nix.package
       pkgs.util-linux
+      pkgs.python3
     ];
     text = ''
       if (( EUID != 0 )); then
@@ -33,15 +35,51 @@ let
       exec 9>/run/lock/nix-cache-publish.lock
       flock 9
       nix copy --to 'file://${cacheRoot}?secret-key=${secretKey}&compression=zstd' "$@"
+      python ${retentionScript} record "$@"
+    '';
+  };
+  gc = pkgs.writeShellApplication {
+    name = "nix-cache-gc";
+    runtimeInputs = [
+      pkgs.python3
+      pkgs.util-linux
+    ];
+    text = ''
+      exec 9>/run/lock/nix-cache-publish.lock
+      flock 9
+      python ${retentionScript} gc "$@"
     '';
   };
 in
 {
-  environment.systemPackages = [ publish ];
-  systemd.tmpfiles.rules = [
-    "d ${cacheRoot} 0755 root root -"
-    "d /var/lib/nix-cache 0700 root root -"
+  environment.systemPackages = [
+    publish
+    gc
   ];
+  systemd = {
+    tmpfiles.rules = [
+      "d ${cacheRoot} 0755 root root -"
+      "d /var/lib/nix-cache 0700 root root -"
+    ];
+
+    services.nix-cache-gc = {
+      description = "Retain 14 days of published Nix cache closures and the latest publication";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${gc}/bin/nix-cache-gc";
+        StateDirectory = "nix-cache";
+        StateDirectoryMode = "0700";
+        UMask = "0077";
+      };
+    };
+    timers.nix-cache-gc = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "*-*-* 04:30:00";
+        Persistent = true;
+      };
+    };
+  };
 
   services.nginx = {
     enable = true;

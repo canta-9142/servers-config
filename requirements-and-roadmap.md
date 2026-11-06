@@ -784,7 +784,8 @@ laptopはCI成功を確認してpullし、原則`--update`なしで`nh os switch
 2026-10-06の初回定期実行は09:00:49に開始し、09:12:54に成功。
 更新コミット`b621cab`のpushと成功status登録を確認した。
 laptopの`always-allow-substitutes = true`を恒久設定・適用済みで、fish補完を含む取得と高速化を確認した。
-retention設定と成功statusの公開ログリンク修正は後続作業。
+retentionは直近14日分と最新公開成功分の保持を実装済み（実機適用は未確認）。
+成功statusの公開ログリンク修正は後続作業。
 
 目的:
 
@@ -801,11 +802,10 @@ Nix StoreのGCとBinary Cacheのretentionは別に管理する。
 例:
 
 - Nix Store:
-  - 30日以上古い不要generationを定期GC
+  - 14日以上古い不要generationを定期GC
 - Binary Cache:
-  - 現在利用中のconfiguration
-  - 最近の数世代
-  - build costが高い成果物
+  - 直近14日以内に公開に成功したconfigurationとその依存物
+  - 最新の公開成功分（14日を超えても保持）
 
 を中心に保持する。
 
@@ -1199,7 +1199,7 @@ RyzenへのWeb自動デプロイを構築する。
 
 Binary Cacheを導入する。
 
-状態: **定期更新・fish補完を含むキャッシュ利用を実機確認、retentionは未実装（2026-10-06）**。
+状態: **定期更新・fish補完を含むキャッシュ利用を実機確認、retentionは実装済み・実機適用未確認（2026-11-06）**。
 Nix標準のファイルキャッシュをnginxと既存Cloudflare Tunnelで配信する。
 署名付きclosure公開コマンド、公開鍵を投入して有効化するlaptop設定、基盤のVM試験を追加。
 署名鍵生成・DNS追加・署名付きprobe取得、laptop設定適用、Forgejoへの正本移行を確認済み。
@@ -1213,7 +1213,8 @@ laptopの`always-allow-substitutes = true`を恒久設定・適用済み。
 同じ構成のdry-runがビルド85件から0件・キャッシュ取得39件に変わり、利用者も実機の高速化を確認した。
 キャッシュ停止時のbuildはVM試験、更新失敗時のpush抑止・Git競合は回帰試験で確認済み。
 本番での意図的な失敗試験は未実施。
-retentionは未実装。成功statusのログリンクは内部URL・インスタンス全体の実行IDになっており、修正が必要。
+retentionは2026-11-06に直近14日分と最新公開成功分の保持を実装（実機適用は未確認）。
+成功statusのログリンクは内部URL・インスタンス全体の実行IDになっており、修正が必要。
 
 作業:
 
@@ -1221,7 +1222,7 @@ retentionは未実装。成功statusのログリンクは内部URL・インス�
 - [x] signing key
 - [x] クライアント設定（fish補完もキャッシュ取得対象にする恒久設定を含む）
 - [x] CI連携
-- [ ] retention設定
+- [x] retention設定（直近14日分＋最新公開成功分。実機適用は未確認）
 - [x] `nixos-config`の正本をForgejoへ移行
 - [x] 12時間ごとのlock更新・laptop構成の事前ビルド・キャッシュ公開後のpush
 - [x] 設定変更push時のlaptop構成ビルド・公開

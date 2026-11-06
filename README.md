@@ -20,7 +20,8 @@ release維持、復旧後の正常デプロイと公開`/healthz`を確認済み
 Phase 7はBinary Cache基盤の公開・署名付きprobe取得、laptop設定適用、Forgejoへの正本移行を確認済み。
 専用Nix Runnerの初回CI成功とlaptopでのキャッシュ利用を利用者が確認済み。
 2026-10-06 09:00 JSTの初回定期実行は成功。fish補完を含むキャッシュ利用の恒久設定・適用も確認済み。
-retention設定と成功statusの公開ログリンク修正が残る。
+キャッシュのretentionは直近14日分と最新公開成功分を保持する方式を実装済み（実機適用は未確認）。
+成功statusの公開ログリンク修正が残る。
 
 ```text
 flake.nix
@@ -31,6 +32,7 @@ modules/system/       SSH・Mesh・保守・管理ユーザー
 tests/forgejo.nix       Forgejo移行・起動抑止・Mesh SSH制限の試験
 tests/web.nix           nginx・healthz・公開release切替の試験
 tests/nix-cache.nix     署名付きcache・closure取得・障害時buildの試験
+tests/nix-cache-gc.py   キャッシュの14日保持・依存物保護・異常時削除抑止の試験
 tests/nix-cache-update.py 定期更新のpush抑止・Git競合の回帰試験
 ```
 

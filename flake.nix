@@ -51,6 +51,10 @@
         web = import ./tests/web.nix { inherit pkgs; };
         runner = import ./tests/runner.nix { inherit pkgs; };
         nix-cache = import ./tests/nix-cache.nix { inherit pkgs; };
+        nix-cache-gc = pkgs.runCommand "nix-cache-gc-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          PYTHONDONTWRITEBYTECODE=1 python ${./tests/nix-cache-gc.py} ${./scripts/nix-cache-gc.py}
+          touch "$out"
+        '';
         nix-cache-update =
           pkgs.runCommand "nix-cache-update-check"
             {
