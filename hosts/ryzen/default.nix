@@ -4,6 +4,7 @@
     ./hardware-configuration.nix
     ./storage.nix
     ./forgejo.nix
+    ./immich.nix
     ./runner.nix
     ./web.nix
     ./nix-cache.nix

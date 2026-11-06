@@ -47,6 +47,7 @@
               touch "$out"
             '';
         forgejo = import ./tests/forgejo.nix { inherit pkgs; };
+        immich = import ./tests/immich.nix { inherit pkgs; };
         web = import ./tests/web.nix { inherit pkgs; };
         runner = import ./tests/runner.nix { inherit pkgs; };
         nix-cache = import ./tests/nix-cache.nix { inherit pkgs; };

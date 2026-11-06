@@ -43,23 +43,6 @@
       htop
       zellij
       dnsutils
-      
-      arduino-cli
-      go_latest
-      gopls
-      gotools
-      golangci-lint
-    ];
-  };
-
-  users.users.rock = {
-    isNormalUser = true;
-    description = "ROCK 3B";
-    shell = pkgs.fish;
-    extraGroups = [ "dialout" ];
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEPtrVcxLNcVNkdjM80No+IjJ9Viijp8O13mopAwaEX jinji@inspiron-5425"
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHgigNufhOIZQFFLRY66ZgGIT4OEiKzSk7bIK9PY/zUF atsu@wsl"
     ];
   };
 
