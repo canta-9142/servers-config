@@ -19,6 +19,7 @@ in
   ];
 
   networking.firewall.extraInputRules = ''
+    iifname "enp39s0" ip saddr 192.168.11.0/24 ip daddr 192.168.11.201 tcp dport ${toString cfg.port} accept
     ip saddr 100.96.0.0/12 ip daddr 100.96.0.1 tcp dport ${toString cfg.port} accept
   '';
 }

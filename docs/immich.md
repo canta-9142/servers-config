@@ -2,7 +2,7 @@
 
 NixOSの`services.immich`でImmich・PostgreSQL（VectorChordを含む）・Redis・
 機械学習サービスを管理する。バージョンは既存の`flake.lock`で固定する。
-Cloudflare Mesh経由でのみ利用し、公開HTTP用Tunnelへの追加は行わない。
+自宅LANまたはCloudflare Mesh経由で利用し、公開HTTP用Tunnelへの追加は行わない。
 
 ## 保存先と容量
 
@@ -34,7 +34,8 @@ nix build .#nixosConfigurations.ryzen.config.system.build.toplevel
 ```
 
 VM試験では、起動・保存先の所有権・管理者作成・DB dump・手動バックアップからの復旧と、
-Mesh送信元かつMesh宛ての通信だけが通ることを確認する。実際のCloudflareには接続しない。
+自宅LAN・Meshそれぞれの許可された経路だけが通ることを確認する。
+LANのインターフェース・送信元・宛先の制限も試験する。実際のCloudflareには接続しない。
 
 実機で空き容量を確認してから、Ryzen上で適用する。
 
@@ -48,22 +49,32 @@ curl -fsS http://127.0.0.1:2283/api/server/ping
 
 設定をビルド・コミットするだけでは、実機には適用されない。
 
-## Meshからの利用
+## LAN・Meshからの利用
 
-スマホ・PCを既存のCloudflare One組織へ接続し、Cloudflare One Clientを有効にする。
+自宅LANでは **`http://192.168.11.201:2283`** に接続する。
+Cloudflare One Clientを有効にせず利用でき、Takeoutの取り込みにもこのURLを使える。
+LAN内のHTTP通信はTLSで暗号化されない。
+
+外出先ではスマホ・PCを既存のCloudflare One組織へ接続し、Cloudflare One Clientを有効にする。
 接続先は **`http://100.96.0.1:2283`**。ブラウザとImmichアプリで同じURLを使う。
 Mesh内の経路はCloudflare One Clientが暗号化する。
 `ryzen.home.arpa`が同じMesh IPへ解決される端末では、その名前でも接続できる。
 
-ファイアウォールは送信元`100.96.0.0/12`・宛先`100.96.0.1`・TCP 2283の組み合わせだけを
-許可する。LAN IP宛ての接続は許可しない。Mesh IPを変更した場合は、
-`hosts/ryzen/immich.nix`のルールも更新する。
+ファイアウォールはTCP 2283の次の組み合わせだけを許可する。
+
+| 経路 | 受信インターフェース | 送信元 | 宛先 |
+| --- | --- | --- | --- |
+| 自宅LAN | `enp39s0` | `192.168.11.0/24` | `192.168.11.201` |
+| Mesh | 指定なし（送信元・宛先で制限） | `100.96.0.0/12` | `100.96.0.1` |
+
+LAN IPはルーターのDHCP予約を使う。サブネット・インターフェース・LAN IP・Mesh IPを
+変更した場合は、`hosts/ryzen/immich.nix`のルールも更新する。
 Cloudflare側でもSplit Tunnelsの対象経路とGatewayのネットワークポリシーが
 この通信を許可している必要がある。
 
 初回はブラウザから管理者を作成し、アプリでログインして少量の写真をアップロードする。
 管理者の作成は利用者が行い、パスワードやAPIキーをNixファイルへ書かない。
-Meshに未接続の端末からは利用・共有リンクの閲覧ができない。
+自宅LAN外でMeshに未接続の端末からは利用・共有リンクの閲覧ができない。
 
 ## バックアップ
 
