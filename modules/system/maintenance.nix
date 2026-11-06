@@ -69,7 +69,7 @@
   nix.gc = {
     automatic = true;
     dates = "Sun 04:00";
-    options = "--delete-older-than 30d";
+    options = "--delete-older-than 14d";
     persistent = true;
   };
 }
