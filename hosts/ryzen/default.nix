@@ -24,7 +24,10 @@
     firewall.enable = true;
   };
 
-  boot.blacklistedKernelModules = [ "nouveau" ];
+  boot = {
+    blacklistedKernelModules = [ "nouveau" ];
+    binfmt.emulatedSystems = [ "aarch64-linux" ];
+  };
 
   environment.sessionVariables.NH_FLAKE = "/home/jinji/servers-config#ryzen";
 
